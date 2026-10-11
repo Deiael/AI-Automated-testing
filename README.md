@@ -4,6 +4,10 @@
 
 **AI 自动化接口测试平台**：三层架构（应用层 / 网关层 / 引擎层），支持项目维度 RAG、用例模板、多引擎切换与 SSE 多轮生成。
 
+## 页面
+<img width="1178" height="914" alt="image" src="https://github.com/user-attachments/assets/ac8fb02e-79a1-4648-974f-be7a4fd096ba" />
+
+
 ## 架构一览
 
 ```
