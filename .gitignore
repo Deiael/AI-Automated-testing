@@ -1,0 +1,40 @@
+# secrets & local env
+.env
+engine/.env
+gateway/.env
+**/.env.local
+
+# python
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node
+**/node_modules/
+**/dist/
+frontend/dist/
+.npm/
+.cache/
+
+# data & artifacts
+gateway/data/
+*.db
+*.sqlite3
+storage/
+
+# os / ide
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# logs
+*.log
+npm-debug.log*

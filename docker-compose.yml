@@ -1,0 +1,64 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ai_test
+      MYSQL_USER: ai_test
+      MYSQL_PASSWORD: ai_test
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  engine:
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    ports:
+      - "8200:8200"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      DATABASE_URL: mysql+pymysql://ai_test:ai_test@mysql:3306/ai_test
+      API_KEY: ${API_KEY:-dev-key}
+      ENGINE_DEFAULT_URL: http://engine:8200
+      VECTOR_STORE: mvp
+      VECTOR_DATA_DIR: /data/vector
+    volumes:
+      - gateway_data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      engine:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5190:80"
+    depends_on:
+      - gateway
+
+volumes:
+  mysql_data:
+  gateway_data:

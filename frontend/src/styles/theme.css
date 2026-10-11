@@ -1,0 +1,210 @@
+:root {
+  --ink: #12202b;
+  --ink-soft: #3d5160;
+  --mute: #6b7f8f;
+  --line: rgba(18, 32, 43, 0.1);
+  --line-strong: rgba(18, 32, 43, 0.16);
+  --panel: rgba(255, 255, 255, 0.78);
+  --panel-solid: #f7fafb;
+  --surface: #ffffff;
+  --teal: #0f8f86;
+  --teal-deep: #0b6e67;
+  --teal-soft: rgba(15, 143, 134, 0.12);
+  --amber: #c9852d;
+  --rose: #c45b5b;
+  --ok: #2f9d6a;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font-brand: "Sora", "Noto Sans SC", sans-serif;
+  --font-body: "Noto Sans SC", "Sora", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 10px 30px rgba(18, 32, 43, 0.06);
+
+  /* Element Plus tokens */
+  --el-color-primary: var(--teal);
+  --el-color-primary-light-3: #3aaea6;
+  --el-color-primary-light-5: #6fc4be;
+  --el-color-primary-light-7: #a5dbd7;
+  --el-color-primary-light-8: #c5e8e5;
+  --el-color-primary-light-9: var(--teal-soft);
+  --el-color-primary-dark-2: var(--teal-deep);
+  --el-border-radius-base: 10px;
+  --el-font-family: var(--font-body);
+  --el-text-color-primary: var(--ink);
+  --el-text-color-regular: var(--ink-soft);
+  --el-border-color: var(--line-strong);
+  --el-fill-color-blank: var(--surface);
+  --el-bg-color: var(--surface);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 8% -10%, rgba(15, 143, 134, 0.18), transparent 55%),
+    radial-gradient(900px 500px at 92% 0%, rgba(45, 98, 140, 0.14), transparent 50%),
+    linear-gradient(180deg, #eef5f6 0%, #f5f8f9 40%, #eef2f4 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(18, 32, 43, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 32, 43, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 78%);
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+h1,
+h2,
+h3,
+.brand-font {
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
+}
+
+.page {
+  animation: rise 0.45s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.page-head h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.page-head p {
+  margin: 6px 0 0;
+  color: var(--mute);
+  font-size: 14px;
+}
+
+.panel {
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+}
+
+.status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill.warn {
+  background: rgba(201, 133, 45, 0.12);
+  color: var(--amber);
+}
+
+.status-pill.danger {
+  background: rgba(196, 91, 91, 0.12);
+  color: var(--rose);
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--teal);
+  --el-button-border-color: var(--teal);
+  --el-button-hover-bg-color: var(--teal-deep);
+  --el-button-hover-border-color: var(--teal-deep);
+  font-weight: 600;
+}
+
+.el-table {
+  --el-table-header-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(15, 143, 134, 0.06);
+  background: transparent !important;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+  color: var(--mute);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.el-dialog {
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+
+.el-menu {
+  border-right: none !important;
+  background: transparent !important;
+}
+
+.el-input__wrapper,
+.el-textarea__inner {
+  box-shadow: 0 0 0 1px var(--line-strong) inset !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--teal) inset !important;
+}
