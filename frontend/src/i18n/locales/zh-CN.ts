@@ -194,6 +194,7 @@ export default {
   chat: {
     title: '对话生成',
     waitingModel: '等待引擎回传模型…',
+    generating: '引擎生成中…',
     mock: '{model} · Mock',
     live: '{model} · DeepSeek',
     empty: '描述接口能力、边界或约束，引擎会流式返回候选产物。',

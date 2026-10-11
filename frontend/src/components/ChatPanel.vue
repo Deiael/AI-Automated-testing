@@ -26,7 +26,10 @@
       <div v-if="streaming" class="msg assistant">
         <div class="bubble">
           <div class="role">{{ t('chat.engine') }}</div>
-          <div class="content">{{ streamText }}<span class="cursor" /></div>
+          <div class="content">
+            <span v-if="!streamText" class="pending">{{ t('chat.generating') }}</span>
+            <template v-else>{{ streamText }}</template><span class="cursor" />
+          </div>
         </div>
       </div>
 
@@ -279,6 +282,10 @@ function scrollBottom() {
   white-space: pre-wrap;
   line-height: 1.55;
   font-size: 14px;
+}
+
+.pending {
+  color: var(--mute);
 }
 
 .cursor {

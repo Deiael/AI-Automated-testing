@@ -50,12 +50,15 @@ export async function streamChat(
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
   let buf = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buf += decoder.decode(value, { stream: true })
+
+  const consume = (chunk: string, flush = false) => {
+    buf += chunk
     const parts = buf.split('\n\n')
-    buf = parts.pop() || ''
+    if (flush) {
+      buf = ''
+    } else {
+      buf = parts.pop() || ''
+    }
     for (const part of parts) {
       const line = part.split('\n').find((l) => l.startsWith('data:'))
       if (!line) continue
@@ -67,5 +70,14 @@ export async function streamChat(
         /* ignore */
       }
     }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      consume(decoder.decode(), true)
+      break
+    }
+    consume(decoder.decode(value, { stream: true }))
   }
 }

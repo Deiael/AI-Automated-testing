@@ -202,7 +202,15 @@ async def chat(session_id: str, body: ChatIn, db: Session = Depends(get_db)):
             err = {"event": "error", "data": {"code": "ENGINE_STREAM_ERROR", "message": str(exc)}}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 def _persist_artifact(

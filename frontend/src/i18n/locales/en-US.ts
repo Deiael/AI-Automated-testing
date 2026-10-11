@@ -194,6 +194,7 @@ export default {
   chat: {
     title: 'Generation chat',
     waitingModel: 'Waiting for engine model…',
+    generating: 'Generating…',
     mock: '{model} · Mock',
     live: '{model} · DeepSeek',
     empty: 'Describe APIs and constraints; the engine streams candidate artifacts.',

@@ -25,7 +25,15 @@ async def stream(req: EngineRequest):
             yield _sse(err)
             yield _sse(EngineEvent(event="done", data={"finish_reason": "error"}))
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 def _sse(ev: EngineEvent) -> str:

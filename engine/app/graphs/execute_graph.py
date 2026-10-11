@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, AsyncIterator
 
@@ -10,7 +11,7 @@ from ai_test_contracts import EngineEvent, EngineRequest
 from app.config import settings
 from app.graphs.mock import mock_execute_plan
 from app.graphs.state import GraphState, req_from_state
-from app.llm.provider import LlmError, complete_json, resolve_api_model
+from app.llm.provider import LlmError, MessageStreamExtractor, complete_json, resolve_api_model, stream_json
 from app.prompts import EXECUTE_SYSTEM
 
 
@@ -92,6 +93,52 @@ async def _summarize(state: GraphState) -> dict[str, Any]:
     return {"report": report, "message": msg}
 
 
+async def _emit_text_tokens(text: str, *, chunk: int = 8, delay: float = 0.01) -> AsyncIterator[EngineEvent]:
+    for i in range(0, len(text), chunk):
+        yield EngineEvent(event="token", data={"delta": text[i : i + chunk]})
+        if delay:
+            await asyncio.sleep(delay)
+
+
+async def _plan_stream(state: GraphState) -> AsyncIterator[EngineEvent]:
+    req = req_from_state(state)
+    payload = json.dumps({"artifacts": req.artifacts, "runtime": req.runtime.model_dump()}, ensure_ascii=False)
+
+    if not settings.llm_enabled:
+        data = mock_execute_plan(req)
+        data["message"] = "（Mock）" + (data.get("message") or "")
+        message = data.get("message") or "开始执行"
+        async for ev in _emit_text_tokens(message):
+            yield ev
+    else:
+        extractor = MessageStreamExtractor()
+        streamed_msg = ""
+        data: dict[str, Any] = {}
+        async for kind, part in stream_json(EXECUTE_SYSTEM, payload, model=req.model):
+            if kind == "token":
+                delta = extractor.feed(str(part))
+                if delta:
+                    streamed_msg += delta
+                    yield EngineEvent(event="token", data={"delta": delta})
+            elif kind == "result":
+                data = part if isinstance(part, dict) else {}
+        if not data.get("plan"):
+            if settings.llm_fallback_mock:
+                data = mock_execute_plan(req)
+            else:
+                raise LlmError("DeepSeek 未返回执行 plan")
+        message = data.get("message") or streamed_msg or "开始执行"
+        if not streamed_msg and message:
+            async for ev in _emit_text_tokens(message, chunk=12, delay=0):
+                yield ev
+
+    plan = data.get("plan") or []
+    message = data.get("message") or "开始执行"
+    state["drafts"] = plan
+    state["message"] = message
+    yield EngineEvent(event="message", data={"content": message})
+
+
 async def run_execute_stream(req: EngineRequest) -> AsyncIterator[EngineEvent]:
     api_model = resolve_api_model(req.model)
     yield EngineEvent(
@@ -105,20 +152,22 @@ async def run_execute_stream(req: EngineRequest) -> AsyncIterator[EngineEvent]:
         },
     )
 
-    # stream progress by running nodes stepwise
     state: GraphState = {"request": req.model_dump(mode="json")}
-    state.update(await _plan(state))
+    async for ev in _plan_stream(state):
+        yield ev
     yield EngineEvent(event="progress", data={"percent": 20, "step": "plan"})
+
     state.update(await _call_http(state))
     for i, item in enumerate(state.get("progress") or []):
         pct = 20 + int(70 * (i + 1) / max(1, len(state.get("progress") or [])))
         yield EngineEvent(event="progress", data={"percent": pct, "step": "call_http", "detail": item})
+
     state.update(await _summarize(state))
     yield EngineEvent(event="progress", data={"percent": 100, "step": "done"})
 
     message = state.get("message") or ""
-    for i in range(0, len(message), 12):
-        yield EngineEvent(event="token", data={"delta": message[i : i + 12]})
+    async for ev in _emit_text_tokens(message, chunk=12, delay=0):
+        yield ev
     yield EngineEvent(event="message", data={"content": message})
     yield EngineEvent(event="artifact", data={"kind": "report", "payload": state.get("report") or {}})
     yield EngineEvent(event="done", data={"finish_reason": "stop", "usage": {}})
