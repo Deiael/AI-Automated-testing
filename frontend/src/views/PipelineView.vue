@@ -91,6 +91,7 @@
         <el-select v-model="templateId" :placeholder="t('pipeline.cases.template')" style="width: 200px">
           <el-option v-for="tpl in templates" :key="tpl.id" :label="tpl.name" :value="tpl.id" />
         </el-select>
+        <el-button @click="templateDrawer = true">{{ t('pipeline.cases.manageTemplates') }}</el-button>
         <el-button :loading="startingPoints" @click="startPoints">{{ t('pipeline.cases.genPoints') }}</el-button>
         <el-button type="primary" plain :disabled="!confirmedPoints.length" :loading="startingCases" @click="startCases">
           {{ t('pipeline.cases.genCases') }}
@@ -98,6 +99,10 @@
         <el-button link type="primary" :disabled="!draftPoints.length" @click="confirmAllPoints">{{ t('pipeline.cases.confirmAllPoints') }}</el-button>
         <el-button link type="primary" :disabled="!draftCases.length" @click="confirmAllCases">{{ t('pipeline.cases.confirmAllCases') }}</el-button>
       </div>
+
+      <el-drawer v-model="templateDrawer" :title="t('templates.title')" size="520px">
+        <TemplatesView v-if="pid" :project-id="pid" @changed="loadTemplates" />
+      </el-drawer>
 
       <div class="gen-grid">
         <div class="chat-col">
@@ -202,11 +207,14 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
 import ChatPanel from '../components/ChatPanel.vue'
+import TemplatesView from './TemplatesView.vue'
+import { usePetStore } from '../stores/pet'
 
 type StepKey = 'req' | 'cases' | 'report'
 
 const { t } = useI18n()
 const route = useRoute()
+const pet = usePetStore()
 const pipelineId = computed(() => String(route.params.pipelineId || ''))
 const pipeline = ref<any>(null)
 const pid = ref('')
@@ -230,6 +238,7 @@ const docs = ref<any[]>([])
 
 const templates = ref<any[]>([])
 const templateId = ref('')
+const templateDrawer = ref(false)
 const points = ref<any[]>([])
 const cases = ref<any[]>([])
 const activeSessionId = ref('')
@@ -282,6 +291,7 @@ async function uploadRequirement() {
     await api.uploadRag(pid.value, form)
     localStorage.setItem(`pipeline_req_${pid.value}`, reqContent.value || reqTitle.value)
     ElMessage.success(t('pipeline.req.saved'))
+    pet.completeQuest('upload_req')
     reqContent.value = ''
     file.value = null
     fileName.value = ''
@@ -314,6 +324,7 @@ async function startPoints() {
       title: '流水线-测试点',
     })
     activeSessionId.value = s.id
+    pet.completeQuest('gen_cases')
     ElMessage.success(t('pipeline.cases.sessionPoints'))
   } finally {
     startingPoints.value = false
@@ -330,6 +341,7 @@ async function startCases() {
       template_id: templateId.value || null,
     })
     activeSessionId.value = s.id
+    pet.completeQuest('gen_cases')
     ElMessage.success(t('pipeline.cases.sessionCases'))
   } finally {
     startingCases.value = false
@@ -404,13 +416,20 @@ async function boot() {
     pid.value = pipeline.value.project_id
     const saved = pipeline.value.step as StepKey
     if (saved && ['req', 'cases', 'report'].includes(saved)) step.value = saved
-    templates.value = await api.listTemplates(pid.value)
-    if (templates.value[0]) templateId.value = templates.value[0].id
+    await loadTemplates()
     await loadDocs()
     await refreshArtifacts()
     await reloadReports()
   } finally {
     booting.value = false
+  }
+}
+
+async function loadTemplates() {
+  templates.value = await api.listTemplates(pid.value)
+  if (!templateId.value && templates.value[0]) templateId.value = templates.value[0].id
+  if (templateId.value && !templates.value.some((t) => t.id === templateId.value) && templates.value[0]) {
+    templateId.value = templates.value[0].id
   }
 }
 

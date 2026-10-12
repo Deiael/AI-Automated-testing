@@ -190,7 +190,58 @@ h3,
 
 .el-dialog {
   border-radius: 16px !important;
-  overflow: hidden;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column;
+  max-height: min(92vh, 820px);
+  margin-top: 8vh !important;
+  padding: 0 !important;
+  box-shadow: 0 24px 64px rgba(18, 32, 43, 0.18) !important;
+}
+
+.el-dialog__header {
+  flex-shrink: 0;
+  padding: 18px 22px 10px !important;
+  margin-right: 0 !important;
+  border-bottom: 1px solid var(--line);
+}
+
+.el-dialog__title {
+  font-family: var(--font-brand);
+  font-weight: 650;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 22px 8px !important;
+}
+
+.el-dialog__footer {
+  flex-shrink: 0;
+  padding: 12px 22px 18px !important;
+  border-top: 1px solid var(--line);
+  background: rgba(247, 250, 251, 0.85);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.el-form--label-top .el-form-item {
+  margin-bottom: 18px;
+}
+
+.el-form--label-top .el-form-item__label {
+  margin-bottom: 8px !important;
+  line-height: 1.4 !important;
+  color: var(--ink-soft);
+  font-weight: 600;
 }
 
 .el-menu {

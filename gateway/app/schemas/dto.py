@@ -111,3 +111,45 @@ class TestRunCreate(BaseModel):
     project_id: str
     case_ids: list[str]
     engine_profile_id: Optional[str] = None
+
+
+class SkillIn(BaseModel):
+    name: str
+    description: str = ""
+    content: str = ""
+    enabled: bool = True
+
+
+class SkillOut(SkillIn):
+    id: str
+    project_id: str
+
+    class Config:
+        from_attributes = True
+
+
+class McpServerIn(BaseModel):
+    name: str
+    transport: str = "http"  # sse | http | stdio
+    url: str = ""
+    command: str = ""
+    args_json: list[Any] = Field(default_factory=list)
+    headers_json: dict[str, str] = Field(default_factory=dict)
+    env_json: dict[str, str] = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class McpServerOut(McpServerIn):
+    id: str
+    project_id: str
+    tools_cache_json: list[Any] = Field(default_factory=list)
+    last_sync_at: Optional[str] = None
+    last_error: str = ""
+
+    class Config:
+        from_attributes = True
+
+
+class McpCallIn(BaseModel):
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)

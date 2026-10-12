@@ -16,6 +16,8 @@ from app.persistence.models import (
     CaseTemplate,
     Message,
     Project,
+    ProjectMcpServer,
+    ProjectSkill,
     Session as ChatSession,
     TestCase,
     TestPoint,
@@ -124,15 +126,70 @@ async def chat(session_id: str, body: ChatIn, db: Session = Depends(get_db)):
         )
         artifacts["test_cases"] = [{"id": tc.id, **(tc.content_json or {}), "title": tc.title} for tc in cases]
 
+    skills = (
+        db.query(ProjectSkill)
+        .filter(ProjectSkill.project_id == project.id, ProjectSkill.enabled.is_(True))
+        .order_by(ProjectSkill.created_at.asc())
+        .all()
+    )
+    artifacts["skills"] = [
+        {"id": s.id, "name": s.name, "description": s.description or "", "content": s.content or ""}
+        for s in skills
+    ]
+
+    mcp_rows = (
+        db.query(ProjectMcpServer)
+        .filter(ProjectMcpServer.project_id == project.id, ProjectMcpServer.enabled.is_(True))
+        .all()
+    )
+    mcp_tools: list[dict[str, Any]] = []
+    for srv in mcp_rows:
+        for tool in srv.tools_cache_json or []:
+            if isinstance(tool, dict):
+                mcp_tools.append(
+                    {
+                        "server_id": srv.id,
+                        "server_name": srv.name,
+                        "name": tool.get("name"),
+                        "description": tool.get("description") or "",
+                        "inputSchema": tool.get("inputSchema") or tool.get("input_schema") or {},
+                    }
+                )
+    artifacts["mcp_tools"] = mcp_tools
+
+    context_chunks = [ContextChunk(doc_id=c.doc_id, title=c.title, text=c.text, score=c.score) for c in chunks]
+    for s in skills:
+        text = (s.content or "").strip()
+        if not text:
+            continue
+        context_chunks.append(
+            ContextChunk(
+                doc_id=f"skill:{s.id}",
+                title=f"Skill · {s.name}",
+                text=text,
+                score=1.0,
+            )
+        )
+    if mcp_tools:
+        lines = []
+        for t in mcp_tools[:40]:
+            lines.append(f"- [{t.get('server_name')}] {t.get('name')}: {t.get('description')}")
+        context_chunks.append(
+            ContextChunk(
+                doc_id="mcp:tools",
+                title="MCP tools",
+                text="可用 MCP 工具：\n" + "\n".join(lines),
+                score=1.0,
+            )
+        )
+
     req = EngineRequest(
         request_id=str(uuid.uuid4()),
         flow=FlowType(session.flow_type),
         model=profile.model,
         session_id=session_id,
         messages=[ChatMessage(role=m.role if m.role in ("user", "assistant", "system") else "user", content=m.content) for m in history],
-        context_chunks=[
-            ContextChunk(doc_id=c.doc_id, title=c.title, text=c.text, score=c.score) for c in chunks
-        ],
+        context_chunks=context_chunks,
         template=template,
         artifacts=artifacts,
         runtime=RuntimeConfig(base_url=project.runtime_base_url or "", headers=project.runtime_headers or {}),

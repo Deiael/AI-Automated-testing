@@ -101,9 +101,13 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
+import { useCurrentProject } from '../composables/useCurrentProject'
+import { usePetStore } from '../stores/pet'
 
 const { t } = useI18n()
 const router = useRouter()
+const { currentProjectId, setCurrentProjectId, refreshProjects } = useCurrentProject()
+const pet = usePetStore()
 const list = ref<any[]>([])
 const projects = ref<any[]>([])
 const loading = ref(false)
@@ -124,7 +128,11 @@ async function load() {
   loading.value = true
   try {
     ;[list.value, projects.value] = await Promise.all([api.listPipelines(), api.listProjects()])
-    if (!form.project_id && projects.value[0]) form.project_id = projects.value[0].id
+    if (currentProjectId.value && projects.value.some((p) => p.id === currentProjectId.value)) {
+      form.project_id = currentProjectId.value
+    } else if (!form.project_id && projects.value[0]) {
+      form.project_id = projects.value[0].id
+    }
   } finally {
     loading.value = false
   }
@@ -140,6 +148,9 @@ async function createProjectQuick() {
     const row = await api.createProject(projectForm)
     projects.value = await api.listProjects()
     form.project_id = row.id
+    setCurrentProjectId(row.id)
+    await refreshProjects()
+    pet.completeQuest('create_project')
     showNewProject.value = false
     ElMessage.success(t('pipelineHub.createdProject', { name: row.name }))
   } finally {
@@ -160,6 +171,8 @@ async function create() {
       description: form.description,
       step: 'req',
     })
+    setCurrentProjectId(form.project_id)
+    pet.completeQuest('create_pipeline')
     router.push(`/pipelines/${row.id}`)
   } finally {
     creating.value = false

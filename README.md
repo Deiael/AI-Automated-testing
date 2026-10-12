@@ -2,7 +2,7 @@
 
 中文 | [English](./README.en.md)
 
-**AI 自动化接口测试平台**：三层架构（应用层 / 网关层 / 引擎层），支持项目维度 RAG、用例模板、多引擎切换与 SSE 多轮生成。
+**AI 自动化接口测试平台**：三层架构（应用层 / 网关层 / 引擎层），支持项目维度 RAG、Skill、MCP、用例模板、多引擎切换、SSE 真流式生成，以及可领养互动的 Q 版宠物伙伴。
 
 ## 页面
 <img width="1178" height="914" alt="image" src="https://github.com/user-attachments/assets/ac8fb02e-79a1-4648-974f-be7a4fd096ba" />
@@ -12,26 +12,57 @@
 
 ```
 浏览器 (Vue3) ──REST/SSE──► 网关 Gateway (FastAPI)
-                              │ 业务库 / RAG / 置信度 / 引擎路由
+                              │ 业务库 / RAG / Skill / MCP / 置信度 / 引擎路由
                               └──SSE──► 引擎 Engine (FastAPI + LangGraph)
                                          Prompt / Agent / 不落业务库
 ```
 
 | 层 | 技术 | 默认端口 | 职责 |
 |---|---|---|---|
-| 应用层 | Vue 3 + Element Plus + vue-i18n | 5190 | UI、流水线向导、中英文切换 |
-| 网关层 | FastAPI + SQLAlchemy | 8100 | 持久化、RAG、引擎切换、后处理 |
-| 引擎层 | FastAPI + LangGraph | 8200 | Agent 编排、SSE 流式输出 |
+| 应用层 | Vue 3 + Element Plus + vue-i18n | 5190 | UI、流水线、配置中心、宠物系统、中英文 |
+| 网关层 | FastAPI + SQLAlchemy | 8100 | 持久化、RAG、Skill、MCP、引擎路由、后处理 |
+| 引擎层 | FastAPI + LangGraph | 8200 | Agent 编排、SSE 真 token 流式输出 |
 
 设计文档：[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)（中文）· [`docs/DEVELOPMENT.en.md`](./docs/DEVELOPMENT.en.md)（English）
 
 ## 功能
 
 - **测试流水线**：创建流水线并关联项目 → 上传需求 → 生成测试点/用例 → 执行报告
-- **项目空间**：引擎绑定、Base URL、RAG、用例模板
+- **配置中心**：顶栏项目切换；**项目空间**（概览 / RAG / Skill / MCP）+ **引擎配置**
 - **多引擎切换**：`EngineProfile` 配置，网关路由（类似 Cursor 切模型）
 - **DeepSeek / OpenAI 兼容**：引擎 `.env` 配置 `OPENAI_BASE_URL` + Key
+- **SSE 真流式**：对话生成按 token 实时回传，不再假回放
+- **澄清卡片**：引擎「需要你补充」时以可选卡片展示，支持多选填写与「其他：自己补充」
 - **中英文界面**：右上角一键切换，偏好写入 `localStorage`
+
+### RAG（项目知识库）
+
+在 **配置中心 → 项目空间 → RAG** 中管理文档：
+
+- 按**项目**隔离入库与检索
+- 生成测试点 / 用例时，网关检索相关片段注入引擎上下文
+- 提升对接口约定、业务规则、历史规范的命中率
+
+### Skill（项目技能）
+
+在 **配置中心 → 项目空间 → Skill** 中维护可复用技能：
+
+- 为项目编写命名 Skill（说明、正文、启用开关）
+- 会话开始时网关把启用中的 Skill 注入引擎 artifacts / 检索上下文
+- 适合沉淀团队约定：断言风格、优先级规则、命名规范等
+
+### MCP（工具服务）
+
+同页可配置 MCP Server（HTTP/SSE），探测工具列表；启用后工具摘要会随会话注入，便于引擎感知可用外部能力。
+
+### 宠物系统
+
+左侧任务栏提供可领养的 Q 版伙伴（男生 / 女生人偶、小猫、小狗）：
+
+- **领养与切换**：透明底全身立绘；点击名称可自定义
+- **玩耍区**：拖到右下角玩耍区，角色会待机晃动 / 欢快跳动
+- **新手任务**：打开配置中心、创建项目等 → 奖励鸡腿
+- **喂养升级**：消耗鸡腿提升饱食与等级；数据存 `localStorage`（`ai-test-pet-v1`）
 
 ## 快速开始
 
@@ -108,21 +139,25 @@ docker compose up -d --build
 
 ## 推荐使用路径
 
-1. **项目空间**：创建项目，配置 Base URL（如 `https://httpbin.org`）
-2. **测试流水线**：创建流水线并关联该项目
-3. 上传需求 → 生成测试点并确认 → 生成用例并确认 → 执行看报告
-4. **引擎配置**：探测健康；DeepSeek Key 在引擎 `.env`，不在前端
+1. **配置中心 → 项目空间**：创建项目，配置 Base URL（如 `https://httpbin.org`）
+2. （可选）上传 RAG 文档；添加 Skill / MCP
+3. **测试流水线**：创建流水线并关联该项目
+4. 上传需求 → 生成测试点并确认 → 生成用例并确认 → 执行看报告
+5. **引擎配置**：探测健康；DeepSeek Key 在引擎 `.env`，不在前端
+6. （可选）领养宠物，完成新手任务赚鸡腿喂养
 
 ## 仓库结构
 
 ```
 AI-Test/
-├── frontend/          # 应用层 Vue3
-├── gateway/           # 网关层 FastAPI
-├── engine/            # 引擎层 FastAPI + LangGraph
-├── packages/contracts # 共享 EngineRequest / EngineEvent
-├── docs/              # 设计文档（中/英）
-├── scripts/           # 启动与工具脚本
+├── frontend/                 # 应用层 Vue3
+│   ├── public/pets/          # Q 版人物立绘（透明 PNG）
+│   └── src/components/pet/   # 宠物 UI（头像 / 拖拽 / 玩耍区 / 任务）
+├── gateway/                  # 网关层 FastAPI（RAG / Skill / MCP API）
+├── engine/                   # 引擎层 FastAPI + LangGraph
+├── packages/contracts        # 共享 EngineRequest / EngineEvent
+├── docs/                     # 设计文档（中/英）
+├── scripts/                  # 启动与工具脚本
 └── docker-compose.yml
 ```
 

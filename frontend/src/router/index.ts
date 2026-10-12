@@ -1,15 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import ProjectsView from '../views/ProjectsView.vue'
 import ProjectLayout from '../views/ProjectLayout.vue'
 import OverviewView from '../views/OverviewView.vue'
 import RagView from '../views/RagView.vue'
-import TemplatesView from '../views/TemplatesView.vue'
-import TestPointsView from '../views/TestPointsView.vue'
-import TestCasesView from '../views/TestCasesView.vue'
-import RunsView from '../views/RunsView.vue'
-import EnginesView from '../views/EnginesView.vue'
+import SkillsView from '../views/SkillsView.vue'
+import McpView from '../views/McpView.vue'
 import PipelineHubView from '../views/PipelineHubView.vue'
 import PipelineView from '../views/PipelineView.vue'
+import SettingsHubView from '../views/SettingsHubView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,8 +14,9 @@ const router = createRouter({
     { path: '/', redirect: '/pipeline' },
     { path: '/pipeline', component: PipelineHubView },
     { path: '/pipelines/:pipelineId', component: PipelineView },
-    { path: '/projects', component: ProjectsView },
-    { path: '/settings/engines', component: EnginesView },
+    { path: '/settings', component: SettingsHubView },
+    { path: '/projects', redirect: { path: '/settings', query: { tab: 'projects' } } },
+    { path: '/settings/engines', redirect: { path: '/settings', query: { tab: 'engines' } } },
     {
       path: '/projects/:id',
       component: ProjectLayout,
@@ -27,10 +25,12 @@ const router = createRouter({
         { path: 'pipeline', redirect: '/pipeline' },
         { path: 'overview', component: OverviewView },
         { path: 'rag', component: RagView },
-        { path: 'templates', component: TemplatesView },
-        { path: 'testpoints', component: TestPointsView },
-        { path: 'testcases', component: TestCasesView },
-        { path: 'runs', component: RunsView },
+        { path: 'skills', component: SkillsView },
+        { path: 'mcp', component: McpView },
+        { path: 'templates', redirect: '/pipeline' },
+        { path: 'testpoints', redirect: '/pipeline' },
+        { path: 'testcases', redirect: '/pipeline' },
+        { path: 'runs', redirect: '/pipeline' },
       ],
     },
   ],

@@ -2,15 +2,15 @@
   <div>
     <div class="page-head">
       <div>
-        <h2 style="font-size: 22px">用例模板</h2>
-        <p>生成时由网关注入引擎，不写在 Prompt 配置里。</p>
+        <h2 style="font-size: 22px">{{ t('templates.title') }}</h2>
+        <p>{{ t('templates.tip') }}</p>
       </div>
-      <el-button type="primary" @click="openCreate">新建模板</el-button>
+      <el-button type="primary" @click="openCreate">{{ t('templates.create') }}</el-button>
     </div>
     <div class="panel table-wrap">
       <el-table :data="list">
-        <el-table-column prop="name" label="名称" width="180" />
-        <el-table-column prop="prompt_hint" label="提示" />
+        <el-table-column prop="name" :label="t('common.name')" width="180" />
+        <el-table-column prop="prompt_hint" :label="t('templates.hint')" />
         <el-table-column label="schema" min-width="240">
           <template #default="{ row }">
             <code class="mono">{{ JSON.stringify(row.schema_json) }}</code>
@@ -22,24 +22,31 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { api } from '../api'
 
+const props = defineProps<{ projectId?: string }>()
+const emit = defineEmits<{ (e: 'changed'): void }>()
+const { t } = useI18n()
 const route = useRoute()
-const pid = String(route.params.id)
+const pid = computed(() => props.projectId || String(route.params.id || ''))
 const list = ref<any[]>([])
 
 async function load() {
-  list.value = await api.listTemplates(pid)
+  if (!pid.value) return
+  list.value = await api.listTemplates(pid.value)
 }
 
 async function openCreate() {
-  const { value } = await ElMessageBox.prompt('模板名称', '新建模板', { inputValue: 'custom-v1' })
-  await api.createTemplate(pid, {
+  const { value } = await ElMessageBox.prompt(t('templates.namePrompt'), t('templates.create'), {
+    inputValue: 'custom-v1',
+  })
+  await api.createTemplate(pid.value, {
     name: value,
-    prompt_hint: '自定义接口用例模板',
+    prompt_hint: t('templates.defaultHint'),
     schema_json: {
       required: ['title', 'steps', 'expected', 'priority'],
       properties: {
@@ -51,9 +58,11 @@ async function openCreate() {
     },
   })
   await load()
+  emit('changed')
 }
 
 onMounted(load)
+watch(pid, load)
 </script>
 
 <style scoped>

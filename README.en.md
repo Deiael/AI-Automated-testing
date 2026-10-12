@@ -2,32 +2,63 @@
 
 [中文](./README.md) | English
 
-**AI-powered API testing platform** with a strict three-layer architecture (App / Gateway / Engine), project-scoped RAG, case templates, multi-engine switching, and SSE multi-turn generation.
+**AI-powered API testing platform** with a strict three-layer architecture (App / Gateway / Engine), project-scoped RAG, Skills, MCP, case templates, multi-engine switching, true SSE token streaming, and an adoptable Q-style pet buddy.
 
 ## Architecture
 
 ```
 Browser (Vue3) ──REST/SSE──► Gateway (FastAPI)
-                              │ DB / RAG / confidence / engine routing
+                              │ DB / RAG / Skills / MCP / confidence / routing
                               └──SSE──► Engine (FastAPI + LangGraph)
                                          Prompts / agents / no business DB
 ```
 
 | Layer | Stack | Port | Responsibility |
 |---|---|---|---|
-| App | Vue 3 + Element Plus + vue-i18n | 5190 | UI, pipeline wizard, zh/en switch |
-| Gateway | FastAPI + SQLAlchemy | 8100 | Persistence, RAG, routing, post-process |
-| Engine | FastAPI + LangGraph | 8200 | Agent graphs, SSE streaming |
+| App | Vue 3 + Element Plus + vue-i18n | 5190 | UI, pipeline, settings hub, pets, zh/en |
+| Gateway | FastAPI + SQLAlchemy | 8100 | Persistence, RAG, Skills, MCP, routing |
+| Engine | FastAPI + LangGraph | 8200 | Agent graphs, true token SSE streaming |
 
 Design docs: [`docs/DEVELOPMENT.en.md`](./docs/DEVELOPMENT.en.md) · [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) (Chinese)
 
 ## Features
 
 - **Pipelines**: create a pipeline linked to a project → requirements → cases → report
-- **Projects**: engine binding, base URL, RAG, templates
+- **Settings hub**: top-bar project switcher; **Project space** (Overview / RAG / Skill / MCP) + **Engines**
 - **Multi-engine**: `EngineProfile` + gateway router (Cursor-like switching)
 - **DeepSeek / OpenAI-compatible**: configure engine `.env`
+- **True SSE streaming**: tokens stream live during chat generation
+- **Clarification cards**: when the engine asks for more info, pick cards (or “Other”) and reply
 - **i18n**: language toggle (top-right), preference in `localStorage`
+
+### RAG (project knowledge)
+
+Manage docs under **Settings → Project space → RAG**:
+
+- Project-scoped ingest and retrieval
+- Gateway retrieves snippets and injects them into engine context when generating points/cases
+- Better recall of API contracts, business rules, and team conventions
+
+### Skills
+
+Maintain reusable skills under **Settings → Project space → Skill**:
+
+- Named skills with description, body, and enable flag
+- Enabled skills are injected into session artifacts / retrieval context
+- Good for assertion style, priority rules, naming conventions, etc.
+
+### MCP
+
+Configure MCP servers (HTTP/SSE), probe tool lists; enabled tool summaries are injected into sessions so the engine knows available external tools.
+
+### Pet system
+
+Sidebar buddy you can adopt (Q-style boy/girl dolls, cat, dog):
+
+- **Adopt / switch**: full-body transparent PNGs; click name to rename
+- **Play zone**: drag to the bottom-right zone for idle sway / happy hop
+- **Newbie quests**: open settings, create a project, etc. → earn drumsticks
+- **Feed & level up**: spend drumsticks; state in `localStorage` (`ai-test-pet-v1`)
 
 ## Quick start
 
@@ -85,17 +116,21 @@ docker compose up -d --build
 
 ## Suggested walkthrough
 
-1. **Projects**: create a project and set Base URL
-2. **Pipelines**: create a pipeline linked to that project
-3. Upload requirements → confirm points → confirm cases → run & report
-4. **Engines**: health-check profiles; keep LLM keys only in `engine/.env`
+1. **Settings → Project space**: create a project and set Base URL
+2. (Optional) upload RAG docs; add Skills / MCP
+3. **Pipelines**: create a pipeline linked to that project
+4. Upload requirements → confirm points → confirm cases → run & report
+5. **Engines**: health-check profiles; keep LLM keys only in `engine/.env`
+6. (Optional) adopt a pet and complete newbie quests
 
 ## Repository layout
 
 ```
 AI-Test/
 ├── frontend/
-├── gateway/
+│   ├── public/pets/          # Q-style character PNGs (transparent)
+│   └── src/components/pet/   # Pet UI (avatar / drag / play zone / quests)
+├── gateway/                  # RAG / Skill / MCP APIs
 ├── engine/
 ├── packages/contracts/
 ├── docs/

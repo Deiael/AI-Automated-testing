@@ -1,8 +1,9 @@
 <template>
-  <div class="page">
+  <div class="page" :class="{ embedded }">
     <div class="page-head">
       <div>
-        <h2>{{ t('engines.title') }}</h2>
+        <h2 v-if="!embedded">{{ t('engines.title') }}</h2>
+        <h3 v-else style="margin:0;font-family:var(--font-brand);font-size:20px">{{ t('engines.title') }}</h3>
         <p>{{ t('engines.subtitle') }}</p>
       </div>
       <el-button type="primary" size="large" @click="dialog = true">{{ t('engines.add') }}</el-button>
@@ -43,7 +44,14 @@
       </article>
     </div>
 
-    <el-dialog v-model="dialog" :title="t('engines.dialogTitle')" width="520px">
+    <el-dialog
+      v-model="dialog"
+      :title="t('engines.dialogTitle')"
+      width="520px"
+      align-center
+      destroy-on-close
+      append-to-body
+    >
       <el-form label-position="top">
         <el-form-item :label="t('common.name')"><el-input v-model="form.name" /></el-form-item>
         <el-form-item :label="t('engines.url')"><el-input v-model="form.engine_base_url" placeholder="http://127.0.0.1:8200" /></el-form-item>
@@ -51,8 +59,10 @@
         <el-form-item :label="t('engines.vendor')"><el-input v-model="form.vendor" /></el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialog = false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="create">{{ t('common.save') }}</el-button>
+        <div class="dialog-actions">
+          <el-button @click="dialog = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="create">{{ t('common.save') }}</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -62,6 +72,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '../api'
+
+defineProps<{ embedded?: boolean }>()
 
 const { t } = useI18n()
 const list = ref<any[]>([])
@@ -102,4 +114,5 @@ onMounted(load)
 .field code { font-family: var(--font-mono); word-break: break-all; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .probe { margin-top: auto; align-self: flex-start; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 </style>

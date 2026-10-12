@@ -35,9 +35,57 @@
 
       <div v-if="questions.length" class="ask panel-soft">
         <div class="ask-title">{{ t('chat.needMore') }}</div>
-        <ul>
-          <li v-for="(q, i) in questions" :key="i">{{ q }}</li>
-        </ul>
+        <p class="ask-hint">{{ t('chat.needMoreHint') }}</p>
+        <div class="ask-cards">
+          <div
+            v-for="(q, i) in questions"
+            :key="i"
+            class="ask-card"
+            :class="{ selected: selectedQs.has(i) }"
+          >
+            <button type="button" class="ask-card-head" @click="toggleQ(i)">
+              <span class="ask-check" aria-hidden="true" />
+              <span class="ask-card-idx">{{ i + 1 }}</span>
+              <span class="ask-card-text">{{ q }}</span>
+            </button>
+            <div v-if="selectedQs.has(i)" class="ask-card-answer" @click.stop>
+              <el-input
+                v-model="answers[i]"
+                type="textarea"
+                :rows="2"
+                resize="none"
+                :placeholder="t('chat.answerPlaceholder')"
+              />
+            </div>
+          </div>
+          <div class="ask-card ask-card-other" :class="{ selected: otherSelected }">
+            <button type="button" class="ask-card-head" @click="toggleOther">
+              <span class="ask-check" aria-hidden="true" />
+              <span class="ask-card-idx">+</span>
+              <span class="ask-card-text">{{ t('chat.otherSelf') }}</span>
+            </button>
+            <div v-if="otherSelected" class="ask-card-answer" @click.stop>
+              <el-input
+                v-model="otherText"
+                type="textarea"
+                :rows="2"
+                resize="none"
+                :placeholder="t('chat.otherPlaceholder')"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="ask-actions">
+          <el-button
+            type="primary"
+            size="small"
+            :disabled="!canSubmitAsk || streaming"
+            :loading="streaming"
+            @click="submitAsk"
+          >
+            {{ t('chat.submitAsk') }}
+          </el-button>
+        </div>
       </div>
 
       <div v-if="artifacts.length" class="arts">
@@ -84,6 +132,10 @@ const input = ref('')
 const streaming = ref(false)
 const streamText = ref('')
 const questions = ref<string[]>([])
+const selectedQs = ref<Set<number>>(new Set())
+const answers = ref<Record<number, string>>({})
+const otherSelected = ref(false)
+const otherText = ref('')
 const artifacts = ref<{ id: string; kind: string; title: string }[]>([])
 const box = ref<HTMLElement>()
 const modelName = ref('')
@@ -93,6 +145,64 @@ const modelLabel = computed(() => {
   if (llmLive.value === false) return t('chat.mock', { model: modelName.value || 'unknown' })
   return t('chat.live', { model: modelName.value || 'unknown' })
 })
+const canSubmitAsk = computed(() => {
+  for (const i of selectedQs.value) {
+    if ((answers.value[i] || '').trim()) return true
+  }
+  return otherSelected.value && !!otherText.value.trim()
+})
+
+function resetAsk() {
+  selectedQs.value = new Set()
+  answers.value = {}
+  otherSelected.value = false
+  otherText.value = ''
+}
+
+function toggleQ(i: number) {
+  const next = new Set(selectedQs.value)
+  if (next.has(i)) {
+    next.delete(i)
+    const { [i]: _, ...rest } = answers.value
+    answers.value = rest
+  } else {
+    next.add(i)
+    if (answers.value[i] === undefined) answers.value = { ...answers.value, [i]: '' }
+  }
+  selectedQs.value = next
+  nextTick(scrollBottom)
+}
+
+function toggleOther() {
+  otherSelected.value = !otherSelected.value
+  if (!otherSelected.value) otherText.value = ''
+  nextTick(scrollBottom)
+}
+
+function buildAskMessage() {
+  const lines: string[] = []
+  const picked = [...selectedQs.value].sort((a, b) => a - b)
+  for (const i of picked) {
+    const q = questions.value[i]
+    const a = (answers.value[i] || '').trim()
+    if (q && a) lines.push(`【${q}】\n${a}`)
+  }
+  const custom = otherText.value.trim()
+  if (otherSelected.value && custom) {
+    lines.push(`【${t('chat.otherSelf')}】\n${custom}`)
+  }
+  if (!lines.length) return ''
+  return `${t('chat.askReplyPrefix')}\n\n${lines.join('\n\n')}`
+}
+
+async function submitAsk() {
+  const text = buildAskMessage()
+  if (!text || streaming.value) return
+  input.value = text
+  resetAsk()
+  questions.value = []
+  await send()
+}
 
 onMounted(async () => {
   const list = await api.listMessages(props.sessionId)
@@ -109,6 +219,7 @@ async function send() {
   streaming.value = true
   streamText.value = ''
   questions.value = []
+  resetAsk()
   try {
     await streamChat(
       props.sessionId,
@@ -129,7 +240,10 @@ async function send() {
           messages.value.push({ role: 'assistant', content })
           streamText.value = ''
         }
-        if (ev.event === 'ask_user') questions.value = ev.data?.questions || []
+        if (ev.event === 'ask_user') {
+          questions.value = ev.data?.questions || []
+          resetAsk()
+        }
         if (ev.event === 'artifact') {
           const kind = ev.data?.kind
           const payload = ev.data?.payload || {}
@@ -306,22 +420,130 @@ function scrollBottom() {
 
 .ask {
   margin-top: 8px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(201, 133, 45, 0.25);
-  background: rgba(201, 133, 45, 0.08);
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 133, 45, 0.28);
+  background: rgba(201, 133, 45, 0.07);
 }
 
 .ask-title {
   font-weight: 650;
-  margin-bottom: 6px;
   color: var(--amber);
 }
 
-.ask ul {
-  margin: 0;
-  padding-left: 18px;
+.ask-hint {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: var(--mute);
+  line-height: 1.4;
+}
+
+.ask-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.ask-card {
+  border-radius: 12px;
+  border: 1px solid rgba(201, 133, 45, 0.22);
+  background: rgba(255, 255, 255, 0.82);
   color: var(--ink-soft);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ask-card:hover {
+  border-color: rgba(201, 133, 45, 0.45);
+}
+
+.ask-card.selected {
+  border-color: rgba(15, 143, 134, 0.45);
+  background: linear-gradient(145deg, rgba(15, 143, 134, 0.1), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 0 0 1px rgba(15, 143, 134, 0.1);
+  color: var(--ink);
+}
+
+.ask-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ask-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(18, 32, 43, 0.22);
+  background: #fff;
+  position: relative;
+}
+
+.ask-card.selected .ask-check {
+  border-color: var(--teal);
+  background: var(--teal);
+}
+
+.ask-card.selected .ask-check::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.ask-card-idx {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber);
+  background: rgba(201, 133, 45, 0.12);
+}
+
+.ask-card.selected .ask-card-idx {
+  color: var(--teal-deep);
+  background: var(--teal-soft);
+}
+
+.ask-card-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ask-card-other .ask-card-text {
+  font-weight: 600;
+}
+
+.ask-card-answer {
+  padding: 0 12px 10px 38px;
+}
+
+.ask-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 .arts {

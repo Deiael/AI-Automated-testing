@@ -1,6 +1,6 @@
 <template>
-  <div class="page">
-    <div class="page-head">
+  <div class="page" :class="{ embedded }">
+    <div v-if="!embedded" class="page-head">
       <div>
         <h2>{{ t('projects.title') }}</h2>
         <p>{{ t('projects.subtitle') }}</p>
@@ -28,7 +28,7 @@
         </div>
         <div class="actions">
           <el-button type="primary" size="large" :loading="creating" :disabled="!form.name.trim()" @click="create">
-            {{ t('projects.createEnter') }}
+            {{ t('projects.createView') }}
           </el-button>
         </div>
       </el-form>
@@ -39,7 +39,7 @@
         v-for="row in list"
         :key="row.id"
         class="project-tile"
-        @click="$router.push('/pipeline')"
+        @click="openDetail(row.id)"
       >
         <div class="tile-top">
           <span class="status-pill">{{ row.status || 'active' }}</span>
@@ -49,7 +49,7 @@
         <p>{{ row.description || t('projects.noDesc') }}</p>
         <div class="tile-foot">
           <span>{{ row.runtime_base_url || t('projects.noBase') }}</span>
-          <span class="enter" @click.stop="$router.push(`/projects/${row.id}/overview`)">{{ t('common.enter') }} →</span>
+          <span class="enter">{{ t('projects.viewDetail') }} →</span>
         </div>
       </button>
     </div>
@@ -62,9 +62,15 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
+import { useCurrentProject } from '../composables/useCurrentProject'
+import { usePetStore } from '../stores/pet'
+
+defineProps<{ embedded?: boolean }>()
 
 const { t } = useI18n()
 const router = useRouter()
+const { setCurrentProjectId, refreshProjects } = useCurrentProject()
+const pet = usePetStore()
 const list = ref<any[]>([])
 const loading = ref(false)
 const creating = ref(false)
@@ -79,6 +85,11 @@ async function load() {
   }
 }
 
+function openDetail(id: string) {
+  setCurrentProjectId(id)
+  router.push(`/projects/${id}/overview`)
+}
+
 async function create() {
   if (!form.name.trim()) {
     ElMessage.warning(t('projects.warnName'))
@@ -86,8 +97,11 @@ async function create() {
   }
   creating.value = true
   try {
-    await api.createProject(form)
-    router.push('/pipeline')
+    const row = await api.createProject(form)
+    setCurrentProjectId(row.id)
+    await refreshProjects()
+    pet.completeQuest('create_project')
+    router.push(`/projects/${row.id}/overview`)
   } finally {
     creating.value = false
   }
@@ -97,6 +111,7 @@ onMounted(load)
 </script>
 
 <style scoped>
+.embedded .create { margin-top: 0; }
 .create { padding: 22px 24px; margin-bottom: 22px; }
 .create-head { margin-bottom: 12px; }
 .kicker { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal-deep); font-weight: 650; }

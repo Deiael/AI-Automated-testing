@@ -29,6 +29,17 @@ export const api = {
   listRuns: (projectId: string) => http.get('/api/test-runs', { params: { project_id: projectId } }).then((r) => r.data),
   listReports: (runId?: string) => http.get('/api/test-reports', { params: runId ? { run_id: runId } : {} }).then((r) => r.data),
   getReport: (id: string) => http.get(`/api/test-reports/${id}`).then((r) => r.data),
+  listSkills: (pid: string) => http.get(`/api/projects/${pid}/skills`).then((r) => r.data),
+  createSkill: (pid: string, data: any) => http.post(`/api/projects/${pid}/skills`, data).then((r) => r.data),
+  updateSkill: (pid: string, id: string, data: any) => http.put(`/api/projects/${pid}/skills/${id}`, data).then((r) => r.data),
+  deleteSkill: (pid: string, id: string) => http.delete(`/api/projects/${pid}/skills/${id}`).then((r) => r.data),
+  listMcpServers: (pid: string) => http.get(`/api/projects/${pid}/mcp-servers`).then((r) => r.data),
+  createMcpServer: (pid: string, data: any) => http.post(`/api/projects/${pid}/mcp-servers`, data).then((r) => r.data),
+  updateMcpServer: (pid: string, id: string, data: any) => http.put(`/api/projects/${pid}/mcp-servers/${id}`, data).then((r) => r.data),
+  deleteMcpServer: (pid: string, id: string) => http.delete(`/api/projects/${pid}/mcp-servers/${id}`).then((r) => r.data),
+  probeMcpServer: (pid: string, id: string) => http.post(`/api/projects/${pid}/mcp-servers/${id}/probe`).then((r) => r.data),
+  callMcpTool: (pid: string, id: string, data: any) =>
+    http.post(`/api/projects/${pid}/mcp-servers/${id}/call`, data).then((r) => r.data),
 }
 
 export async function streamChat(

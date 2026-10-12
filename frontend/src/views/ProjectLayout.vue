@@ -11,7 +11,7 @@
           <span>{{ t('project.baseUrl') }}</span>
           <code>{{ project.runtime_base_url || '—' }}</code>
         </div>
-        <router-link class="back" to="/projects">{{ t('project.back') }}</router-link>
+        <router-link class="back" to="/settings?tab=projects">{{ t('project.back') }}</router-link>
       </div>
     </div>
 
@@ -38,20 +38,20 @@ import { computed, onMounted, provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '../api'
+import { useCurrentProject } from '../composables/useCurrentProject'
 
 const { t } = useI18n()
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const project = ref<any>(null)
 provide('project', project)
+const { setCurrentProjectId } = useCurrentProject()
 
 const tabs = computed(() => [
   { labelKey: 'project.tabs.overview', to: `/projects/${id.value}/overview` },
   { labelKey: 'project.tabs.rag', to: `/projects/${id.value}/rag` },
-  { labelKey: 'project.tabs.templates', to: `/projects/${id.value}/templates` },
-  { labelKey: 'project.tabs.testpoints', to: `/projects/${id.value}/testpoints` },
-  { labelKey: 'project.tabs.testcases', to: `/projects/${id.value}/testcases` },
-  { labelKey: 'project.tabs.runs', to: `/projects/${id.value}/runs` },
+  { labelKey: 'project.tabs.skills', to: `/projects/${id.value}/skills` },
+  { labelKey: 'project.tabs.mcp', to: `/projects/${id.value}/mcp` },
 ])
 
 function isActive(to: string) {
@@ -60,6 +60,7 @@ function isActive(to: string) {
 
 async function load() {
   project.value = await api.getProject(id.value)
+  setCurrentProjectId(id.value)
 }
 
 onMounted(load)
@@ -84,13 +85,16 @@ watch(id, load)
 }
 
 .hero h2 {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
+  font-family: var(--font-brand);
   font-size: 28px;
 }
 
 .hero p {
   margin: 8px 0 0;
   color: var(--mute);
+  max-width: 560px;
+  line-height: 1.55;
 }
 
 .meta {
@@ -98,30 +102,21 @@ watch(id, load)
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
-  min-width: 220px;
 }
 
 .meta-item {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
   gap: 4px;
-}
-
-.meta-item span {
-  font-size: 11px;
+  align-items: flex-end;
+  font-size: 12px;
   color: var(--mute);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .meta-item code {
   font-family: var(--font-mono);
+  color: var(--ink-soft);
   font-size: 12px;
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .back {
@@ -133,48 +128,29 @@ watch(id, load)
 
 .tabs {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 16px;
-  padding: 6px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid var(--line);
+  flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 
 .tab {
-  text-decoration: none;
-  color: var(--ink-soft);
   padding: 8px 14px;
-  border-radius: 10px;
-  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-soft);
+  text-decoration: none;
   font-size: 13px;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.tab:hover {
-  background: rgba(15, 143, 134, 0.08);
-  color: var(--ink);
+  font-weight: 600;
 }
 
 .tab.active {
-  background: var(--teal);
-  color: #fff;
+  color: var(--teal-deep);
+  border-color: rgba(15, 143, 134, 0.35);
+  background: var(--teal-soft);
 }
 
 .body {
   min-height: 320px;
-}
-
-@media (max-width: 800px) {
-  .hero {
-    flex-direction: column;
-  }
-  .meta {
-    align-items: flex-start;
-  }
-  .meta-item {
-    align-items: flex-start;
-  }
 }
 </style>

@@ -17,24 +17,13 @@
             <span class="nav-ico">◎</span>
             <span>{{ t('nav.pipeline') }}</span>
           </router-link>
-          <router-link class="nav-item" to="/projects" :class="{ active: isProjects }">
-            <span class="nav-ico">◇</span>
-            <span>{{ t('nav.projects') }}</span>
-          </router-link>
-          <router-link class="nav-item" to="/settings/engines" :class="{ active: isEngines }">
+          <router-link class="nav-item" to="/settings" :class="{ active: isSettings }">
             <span class="nav-ico">⬡</span>
-            <span>{{ t('nav.engines') }}</span>
+            <span>{{ t('nav.settings') }}</span>
           </router-link>
         </nav>
 
-        <div class="rail-foot">
-          <div class="foot-label">{{ t('rail.stepsTitle') }}</div>
-          <ol>
-            <li>{{ t('rail.step1') }}</li>
-            <li>{{ t('rail.step2') }}</li>
-            <li>{{ t('rail.step3') }}</li>
-          </ol>
-        </div>
+        <PetQuestPanel @adopt="adoptOpen = true" />
       </aside>
 
       <section class="main">
@@ -44,6 +33,18 @@
             <h1>{{ title }}</h1>
           </div>
           <div class="top-actions">
+            <div class="project-switch">
+              <span class="switch-label">{{ t('switcher.label') }}</span>
+              <el-select
+                :model-value="currentProjectId || undefined"
+                filterable
+                :placeholder="t('switcher.placeholder')"
+                style="width: 180px"
+                @change="onSwitchProject"
+              >
+                <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+              </el-select>
+            </div>
             <el-select
               class="lang-select"
               :model-value="locale"
@@ -64,32 +65,54 @@
           <router-view />
         </main>
       </section>
+
+      <PetBuddy />
+      <PetPlayZone />
+      <PetAdoptDialog v-model="adoptOpen" />
     </div>
   </el-config-provider>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
 import { setLocale, type AppLocale } from './i18n'
+import { useCurrentProject } from './composables/useCurrentProject'
+import { usePetStore } from './stores/pet'
+import PetBuddy from './components/pet/PetBuddy.vue'
+import PetPlayZone from './components/pet/PetPlayZone.vue'
+import PetAdoptDialog from './components/pet/PetAdoptDialog.vue'
+import PetQuestPanel from './components/pet/PetQuestPanel.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
+const { projects, currentProjectId, setCurrentProjectId, refreshProjects } = useCurrentProject()
+const pet = usePetStore()
 
 const isPipeline = computed(() => route.path.startsWith('/pipeline') || route.path.includes('/pipelines'))
-const isProjects = computed(() => route.path.startsWith('/projects'))
-const isEngines = computed(() => route.path.startsWith('/settings'))
+const isSettings = computed(() => route.path.startsWith('/settings') || route.path.startsWith('/projects'))
 const title = computed(() => {
-  if (isEngines.value) return t('titles.engines')
-  if (isPipeline.value) return t('titles.pipeline')
-  return t('titles.projects')
+  if (route.path.startsWith('/projects/') && route.params.id) return t('titles.projectDetail')
+  if (isSettings.value) return t('titles.settings')
+  return t('titles.pipeline')
 })
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path.startsWith('/settings') || path.startsWith('/projects')) {
+      pet.completeQuest('open_settings')
+    }
+  },
+  { immediate: true },
+)
 
 const elLocale = computed(() => (locale.value === 'en-US' ? en : zhCn))
 const apiKey = ref(localStorage.getItem('apiKey') || 'dev-key')
+const adoptOpen = ref(false)
 
 function saveKey() {
   localStorage.setItem('apiKey', apiKey.value || 'dev-key')
@@ -98,6 +121,14 @@ function saveKey() {
 function switchLang(lang: string) {
   setLocale(lang as AppLocale)
 }
+
+function onSwitchProject(id: string) {
+  setCurrentProjectId(id)
+}
+
+onMounted(() => {
+  void refreshProjects()
+})
 </script>
 
 <style scoped>
@@ -114,10 +145,11 @@ function switchLang(lang: string) {
   padding: 22px 16px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 20px;
   border-right: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 250, 251, 0.55));
   backdrop-filter: blur(16px);
+  overflow: hidden;
 }
 
 .brand {
@@ -207,30 +239,6 @@ function switchLang(lang: string) {
   opacity: 0.8;
 }
 
-.rail-foot {
-  margin-top: auto;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px dashed var(--line-strong);
-  background: rgba(255, 255, 255, 0.45);
-}
-
-.foot-label {
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--mute);
-  margin-bottom: 8px;
-}
-
-.rail-foot ol {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--ink-soft);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
 .main {
   min-width: 0;
   display: flex;
@@ -265,6 +273,23 @@ function switchLang(lang: string) {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.project-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.switch-label {
+  font-size: 11px;
+  color: var(--mute);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .lang-select {
@@ -314,6 +339,12 @@ function switchLang(lang: string) {
   flex: 1;
 }
 
+@media (max-width: 1100px) {
+  .project-switch .switch-label {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;
@@ -323,9 +354,6 @@ function switchLang(lang: string) {
     height: auto;
     border-right: none;
     border-bottom: 1px solid var(--line);
-  }
-  .rail-foot {
-    display: none;
   }
   .content,
   .topbar {
@@ -337,4 +365,5 @@ function switchLang(lang: string) {
     justify-content: flex-end;
   }
 }
+
 </style>

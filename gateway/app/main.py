@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import artifacts, engines, pipelines, projects, rag, sessions
+from app.api import artifacts, engines, mcp_servers, pipelines, projects, rag, sessions, skills
 from app.bootstrap import seed_default_engine
 from app.config import settings
 from app.persistence.db import SessionLocal, init_db
@@ -25,6 +25,8 @@ app.include_router(projects.router)
 app.include_router(pipelines.router)
 app.include_router(engines.router)
 app.include_router(rag.router)
+app.include_router(skills.router)
+app.include_router(mcp_servers.router)
 app.include_router(sessions.router)
 app.include_router(artifacts.router)
 

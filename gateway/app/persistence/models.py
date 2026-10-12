@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.persistence.db import Base
@@ -148,4 +148,35 @@ class TestReport(Base):
     summary_json: Mapped[dict] = mapped_column(JSON, default=dict)
     detail_json: Mapped[dict] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(32), default="DONE")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ProjectSkill(Base):
+    __tablename__ = "project_skills"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ProjectMcpServer(Base):
+    __tablename__ = "project_mcp_servers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    transport: Mapped[str] = mapped_column(String(16), default="http")  # sse | http | stdio
+    url: Mapped[str] = mapped_column(String(512), default="")
+    command: Mapped[str] = mapped_column(String(512), default="")
+    args_json: Mapped[list] = mapped_column(JSON, default=list)
+    headers_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    env_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    tools_cache_json: Mapped[list] = mapped_column(JSON, default=list)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
