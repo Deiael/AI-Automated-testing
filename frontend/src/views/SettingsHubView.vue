@@ -14,6 +14,9 @@
       <el-tab-pane :label="t('settings.tabEngines')" name="engines">
         <EnginesView embedded />
       </el-tab-pane>
+      <el-tab-pane :label="t('settings.tabTools')" name="tools">
+        <RembgView embedded />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -24,12 +27,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ProjectsView from './ProjectsView.vue'
 import EnginesView from './EnginesView.vue'
+import RembgView from './RembgView.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const tab = ref(String(route.query.tab || 'projects') === 'engines' ? 'engines' : 'projects')
+const tabs = new Set(['projects', 'engines', 'tools'])
+const tab = ref(tabs.has(String(route.query.tab)) ? String(route.query.tab) : 'projects')
 
 function onTab(name: string | number) {
   router.replace({ path: '/settings', query: { tab: String(name) } })
@@ -38,7 +43,8 @@ function onTab(name: string | number) {
 watch(
   () => route.query.tab,
   (v) => {
-    tab.value = String(v || 'projects') === 'engines' ? 'engines' : 'projects'
+    const next = String(v || 'projects')
+    tab.value = tabs.has(next) ? next : 'projects'
   },
 )
 </script>

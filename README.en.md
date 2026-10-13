@@ -51,6 +51,10 @@ Maintain reusable skills under **Settings → Project space → Skill**:
 
 Configure MCP servers (HTTP/SSE), probe tool lists; enabled tool summaries are injected into sessions so the engine knows available external tools.
 
+### Background removal (rembg)
+
+Under **Settings → Tools**, upload an image; the gateway uses open-source [rembg](https://github.com/danielgatis/rembg) to export a transparent PNG. First use downloads the ONNX model; install `rembg[cpu]` and `pillow` in the gateway environment.
+
 ### Pet system
 
 Sidebar buddy you can adopt (Q-style boy/girl dolls, cat, dog):

@@ -40,6 +40,20 @@ export const api = {
   probeMcpServer: (pid: string, id: string) => http.post(`/api/projects/${pid}/mcp-servers/${id}/probe`).then((r) => r.data),
   callMcpTool: (pid: string, id: string, data: any) =>
     http.post(`/api/projects/${pid}/mcp-servers/${id}/call`, data).then((r) => r.data),
+  listRembgModels: () => http.get('/api/tools/rembg/models').then((r) => r.data),
+  removeBg: (file: File, model = 'u2netp', alphaMatting = false) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('model', model)
+    form.append('alpha_matting', String(alphaMatting))
+    return http
+      .post('/api/tools/rembg', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 180000,
+      })
+      .then((r) => r.data as Blob)
+  },
 }
 
 export async function streamChat(

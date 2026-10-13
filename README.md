@@ -56,6 +56,10 @@
 
 同页可配置 MCP Server（HTTP/SSE），探测工具列表；启用后工具摘要会随会话注入，便于引擎感知可用外部能力。
 
+### 一键抠图（rembg）
+
+在 **配置中心 → 实用工具** 上传图片，网关调用开源 [rembg](https://github.com/danielgatis/rembg) 分割主体并导出透明 PNG。首次使用会下载对应 ONNX 模型；需在网关环境安装 `rembg[cpu]` 与 `pillow`。
+
 ### 宠物系统
 
 左侧任务栏提供可领养的 Q 版伙伴（男生 / 女生人偶、小猫、小狗）：
@@ -177,6 +181,16 @@ python -c "from ai_test_contracts import EngineRequest; print('ok')"
 ```
 
 CI：`.github/workflows/ci.yml` 会跑前端构建与 Python 安装校验。
+
+## 开发者工具：REA（自逆向学习）
+
+用 [REA](https://github.com/morluto/rea) 在 Cursor 里检查本仓库产物（前端包 / 行为），适合学习逆向。详见 [`docs/REA.md`](./docs/REA.md)。
+
+```bat
+scripts\setup-rea.cmd
+```
+
+装好后重启 Cursor。REA 走本地 stdio MCP，**不要**配进「配置中心 → MCP」（网关只支持 HTTP/SSE）。
 
 ## 安全提示
 
