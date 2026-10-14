@@ -55,7 +55,8 @@ function defaultState(): PetState {
     hunger: 70,
     mood: 80,
     legs: 2,
-    pos: { x: 24, y: 120 },
+    // Keep clear of the left nav rail (~248px) so clicks aren't blocked.
+    pos: { x: typeof window !== 'undefined' ? Math.max(280, window.innerWidth - 140) : 280, y: 120 },
     inPlayZone: false,
     completedQuests: [],
     claimedQuests: [],
@@ -66,7 +67,15 @@ function load(): PetState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultState()
-    return { ...defaultState(), ...JSON.parse(raw) }
+    const merged = { ...defaultState(), ...JSON.parse(raw) } as PetState
+    // Old default sat on the left rail and blocked nav clicks.
+    if (merged.pos && merged.pos.x < 260) {
+      merged.pos = {
+        x: typeof window !== 'undefined' ? Math.max(280, window.innerWidth - 140) : 280,
+        y: merged.pos.y || 120,
+      }
+    }
+    return merged
   } catch {
     return defaultState()
   }
@@ -125,7 +134,7 @@ export const usePetStore = defineStore('pet', () => {
   }
 
   function setPos(x: number, y: number) {
-    state.value.pos = { x, y }
+    state.value.pos = { x: Math.max(260, x), y }
   }
 
   function setInPlayZone(v: boolean) {

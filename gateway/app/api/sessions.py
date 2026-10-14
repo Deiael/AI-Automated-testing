@@ -84,7 +84,7 @@ async def chat(session_id: str, body: ChatIn, db: Session = Depends(get_db)):
     db.commit()
 
     profile = engine_router.resolve(db, project.id, body.engine_profile_id or session.engine_profile_id)
-    chunks = await rag_service.search(project.id, body.message)
+    chunks = await rag_service.search(project.id, body.message, db=db)
     history = (
         db.query(Message)
         .filter(Message.session_id == session_id)

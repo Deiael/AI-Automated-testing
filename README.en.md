@@ -33,11 +33,13 @@ Design docs: [`docs/DEVELOPMENT.en.md`](./docs/DEVELOPMENT.en.md) · [`docs/DEVE
 
 ### RAG (project knowledge)
 
-Manage docs under **Settings → Project space → RAG**:
+Under **Project detail → RAG**:
 
-- Project-scoped ingest and retrieval
-- Gateway retrieves snippets and injects them into engine context when generating points/cases
-- Better recall of API contracts, business rules, and team conventions
+- **Multiple knowledge bases** per project
+- **Selectable chunk strategies** with visual preview
+- **Search trial** and **Hit@K / keyword-recall eval**
+- Backends: `VECTOR_STORE=mvp` or `milvus`; optional Embedding API
+- Gateway injects retrieved snippets into engine `context_chunks`
 
 ### Skills
 

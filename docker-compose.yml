@@ -42,8 +42,13 @@ services:
       DATABASE_URL: mysql+pymysql://ai_test:ai_test@mysql:3306/ai_test
       API_KEY: ${API_KEY:-dev-key}
       ENGINE_DEFAULT_URL: http://engine:8200
-      VECTOR_STORE: mvp
+      VECTOR_STORE: ${VECTOR_STORE:-mvp}
       VECTOR_DATA_DIR: /data/vector
+      MILVUS_URI: ${MILVUS_URI:-/data/milvus_rag.db}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-384}
     volumes:
       - gateway_data:/data
     depends_on:
@@ -51,6 +56,15 @@ services:
         condition: service_healthy
       engine:
         condition: service_started
+
+  # Optional full Milvus stack — set MILVUS_URI=http://milvus:19530 and VECTOR_STORE=milvus
+  # milvus:
+  #   image: milvusdb/milvus:v2.4.15
+  #   command: ["milvus", "run", "standalone"]
+  #   ports:
+  #     - "19530:19530"
+  #   volumes:
+  #     - milvus_data:/var/lib/milvus
 
   frontend:
     build: ./frontend

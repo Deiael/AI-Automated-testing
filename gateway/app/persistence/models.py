@@ -64,16 +64,52 @@ class CaseTemplate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class RagKnowledgeBase(Base):
+    """Project-scoped RAG knowledge base with chunk strategy settings."""
+
+    __tablename__ = "rag_knowledge_bases"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str] = mapped_column(Text, default="")
+    chunk_strategy: Mapped[str] = mapped_column(String(32), default="fixed")  # fixed|paragraph|markdown|openapi
+    chunk_size: Mapped[int] = mapped_column(Integer, default=400)
+    chunk_overlap: Mapped[int] = mapped_column(Integer, default=40)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class RagDocument(Base):
     __tablename__ = "rag_documents"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    kb_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("rag_knowledge_bases.id"), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(256))
     source: Mapped[str] = mapped_column(String(512), default="")
     content: Mapped[str] = mapped_column(Text, default="")
+    chunk_strategy: Mapped[str] = mapped_column(String(32), default="")
     status: Mapped[str] = mapped_column(String(32), default="indexed")
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    chunks_json: Mapped[list] = mapped_column(JSON, default=list)  # preview cache
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RagEvalCase(Base):
+    """Gold query for recall evaluation against a knowledge base."""
+
+    __tablename__ = "rag_eval_cases"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    kb_id: Mapped[str] = mapped_column(String(36), ForeignKey("rag_knowledge_bases.id"), index=True)
+    query: Mapped[str] = mapped_column(Text)
+    # Expected relevant doc ids and/or keywords that should appear in retrieved chunks
+    expected_doc_ids: Mapped[list] = mapped_column(JSON, default=list)
+    expected_keywords: Mapped[list] = mapped_column(JSON, default=list)
+    note: Mapped[str] = mapped_column(String(256), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

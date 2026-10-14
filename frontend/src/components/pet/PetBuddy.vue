@@ -42,21 +42,32 @@ function showBubble(text: string) {
   }, 1800)
 }
 
+const RAIL_SAFE = 260
+let activePointerId: number | null = null
+
 function onDown(e: PointerEvent) {
-  if (!el.value) return
+  if (!el.value || e.button !== 0) return
+  e.preventDefault()
   dragging.value = true
-  el.value.setPointerCapture(e.pointerId)
+  activePointerId = e.pointerId
+  try {
+    el.value.setPointerCapture(e.pointerId)
+  } catch {
+    /* ignore */
+  }
   ox = e.clientX - pet.state.pos.x
   oy = e.clientY - pet.state.pos.y
   window.addEventListener('pointermove', onMove)
   window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onUp)
 }
 
 function onMove(e: PointerEvent) {
   if (!dragging.value) return
   const maxX = window.innerWidth - 100
   const maxY = window.innerHeight - 120
-  const x = Math.min(maxX, Math.max(8, e.clientX - ox))
+  // Never cover the left navigation rail
+  const x = Math.min(maxX, Math.max(RAIL_SAFE, e.clientX - ox))
   const y = Math.min(maxY, Math.max(8, e.clientY - oy))
   pet.setPos(x, y)
 
@@ -73,23 +84,36 @@ function onMove(e: PointerEvent) {
   }
 }
 
-function onUp() {
+function onUp(e?: PointerEvent) {
+  if (el.value && activePointerId != null) {
+    try {
+      el.value.releasePointerCapture(activePointerId)
+    } catch {
+      /* ignore */
+    }
+  }
+  activePointerId = null
   dragging.value = false
   window.removeEventListener('pointermove', onMove)
   window.removeEventListener('pointerup', onUp)
+  window.removeEventListener('pointercancel', onUp)
+  if (e) e.preventDefault()
 }
 
 let decayTimer: number | undefined
 
 onMounted(() => {
   decayTimer = window.setInterval(() => pet.tickDecay(), 60000)
+  // Nudge pets that were saved over the left rail
+  if (pet.state.pos.x < RAIL_SAFE) {
+    pet.setPos(Math.max(RAIL_SAFE, window.innerWidth - 140), pet.state.pos.y)
+  }
 })
 
 onBeforeUnmount(() => {
+  onUp()
   window.clearInterval(decayTimer)
   window.clearTimeout(bubbleTimer)
-  window.removeEventListener('pointermove', onMove)
-  window.removeEventListener('pointerup', onUp)
 })
 </script>
 

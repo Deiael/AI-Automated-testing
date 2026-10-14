@@ -53,10 +53,59 @@ class TemplateOut(TemplateIn):
 class RagDocOut(BaseModel):
     id: str
     project_id: str
+    kb_id: Optional[str] = None
     title: str
     source: str
     status: str
     chunk_count: int
+    chunk_strategy: str = ""
+
+    class Config:
+        from_attributes = True
+
+
+class RagKbIn(BaseModel):
+    name: str = "未命名知识库"
+    description: str = ""
+    chunk_strategy: str = "fixed"
+    chunk_size: int = 400
+    chunk_overlap: int = 40
+    is_default: bool = False
+    status: Optional[str] = None
+
+
+class RagKbOut(BaseModel):
+    id: str
+    project_id: str
+    name: str
+    description: str = ""
+    chunk_strategy: str
+    chunk_size: int
+    chunk_overlap: int
+    is_default: bool = False
+    status: str = "active"
+    doc_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class RagEvalCaseIn(BaseModel):
+    kb_id: str
+    query: str
+    expected_doc_ids: list[str] = Field(default_factory=list)
+    expected_keywords: list[str] = Field(default_factory=list)
+    note: str = ""
+
+
+class RagEvalCaseOut(BaseModel):
+    id: str
+    project_id: str
+    kb_id: str
+    query: str
+    expected_doc_ids: list = Field(default_factory=list)
+    expected_keywords: list = Field(default_factory=list)
+    note: str = ""
 
     class Config:
         from_attributes = True

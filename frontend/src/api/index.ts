@@ -16,10 +16,27 @@ export const api = {
   createEngine: (data: any) => http.post('/api/engine-profiles', data).then((r) => r.data),
   updateEngine: (id: string, data: any) => http.put(`/api/engine-profiles/${id}`, data).then((r) => r.data),
   engineHealth: (id: string) => http.get(`/api/engine-profiles/${id}/health`).then((r) => r.data),
-  listRagDocs: (pid: string) => http.get(`/api/projects/${pid}/rag/docs`).then((r) => r.data),
+  listRagDocs: (pid: string, kbId?: string) =>
+    http.get(`/api/projects/${pid}/rag/docs`, { params: kbId ? { kb_id: kbId } : {} }).then((r) => r.data),
+  getRagDoc: (pid: string, docId: string) => http.get(`/api/projects/${pid}/rag/docs/${docId}`).then((r) => r.data),
   uploadRag: (pid: string, form: FormData) =>
     http.post(`/api/projects/${pid}/rag/docs`, form, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data),
   deleteRag: (pid: string, docId: string) => http.delete(`/api/projects/${pid}/rag/docs/${docId}`).then((r) => r.data),
+  ragMeta: (pid: string) => http.get(`/api/projects/${pid}/rag/meta`).then((r) => r.data),
+  listRagKbs: (pid: string) => http.get(`/api/projects/${pid}/rag/knowledge-bases`).then((r) => r.data),
+  createRagKb: (pid: string, data: any) => http.post(`/api/projects/${pid}/rag/knowledge-bases`, data).then((r) => r.data),
+  updateRagKb: (pid: string, kbId: string, data: any) =>
+    http.put(`/api/projects/${pid}/rag/knowledge-bases/${kbId}`, data).then((r) => r.data),
+  deleteRagKb: (pid: string, kbId: string) => http.delete(`/api/projects/${pid}/rag/knowledge-bases/${kbId}`).then((r) => r.data),
+  previewRagChunks: (pid: string, data: any) => http.post(`/api/projects/${pid}/rag/preview`, data).then((r) => r.data),
+  searchRag: (pid: string, data: any) => http.post(`/api/projects/${pid}/rag/search`, data).then((r) => r.data),
+  reindexRagKb: (pid: string, kbId: string) =>
+    http.post(`/api/projects/${pid}/rag/knowledge-bases/${kbId}/reindex`).then((r) => r.data),
+  listRagEvalCases: (pid: string, kbId: string) =>
+    http.get(`/api/projects/${pid}/rag/eval-cases`, { params: { kb_id: kbId } }).then((r) => r.data),
+  createRagEvalCase: (pid: string, data: any) => http.post(`/api/projects/${pid}/rag/eval-cases`, data).then((r) => r.data),
+  deleteRagEvalCase: (pid: string, id: string) => http.delete(`/api/projects/${pid}/rag/eval-cases/${id}`).then((r) => r.data),
+  runRagEval: (pid: string, data: any) => http.post(`/api/projects/${pid}/rag/eval/run`, data).then((r) => r.data),
   createSession: (data: any) => http.post('/api/sessions', data).then((r) => r.data),
   listMessages: (sid: string) => http.get(`/api/sessions/${sid}/messages`).then((r) => r.data),
   listTestPoints: (projectId: string) => http.get('/api/test-points', { params: { project_id: projectId } }).then((r) => r.data),
