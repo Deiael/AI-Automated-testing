@@ -40,6 +40,7 @@ class TemplateSpec(BaseModel):
 class RuntimeConfig(BaseModel):
     base_url: str = ""
     headers: dict[str, str] = Field(default_factory=dict)
+    variables: dict[str, Any] = Field(default_factory=dict)
 
 
 class EngineRequest(BaseModel):

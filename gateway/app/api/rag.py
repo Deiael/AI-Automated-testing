@@ -24,6 +24,7 @@ class PreviewIn(BaseModel):
 class SearchIn(BaseModel):
     query: str
     kb_id: str | None = None
+    pipeline_id: str | None = None
     top_k: int = Field(default=5, ge=1, le=50)
 
 
@@ -110,7 +111,14 @@ def preview_chunks_api(project_id: str, body: PreviewIn, db: Session = Depends(g
 async def search_api(project_id: str, body: SearchIn, db: Session = Depends(get_db)):
     if not db.get(Project, project_id):
         raise HTTPException(404, "project not found")
-    hits = await rag_service.search(project_id, body.query, top_k=body.top_k, kb_id=body.kb_id, db=db)
+    hits = await rag_service.search(
+        project_id,
+        body.query,
+        top_k=body.top_k,
+        kb_id=body.kb_id,
+        pipeline_id=body.pipeline_id,
+        db=db,
+    )
     return {
         "query": body.query,
         "top_k": body.top_k,
@@ -130,10 +138,17 @@ async def search_api(project_id: str, body: SearchIn, db: Session = Depends(get_
 
 
 @router.get("/docs", response_model=list[RagDocOut])
-def list_docs(project_id: str, kb_id: str | None = None, db: Session = Depends(get_db)):
+def list_docs(
+    project_id: str,
+    kb_id: str | None = None,
+    pipeline_id: str | None = None,
+    db: Session = Depends(get_db),
+):
     q = db.query(RagDocument).filter(RagDocument.project_id == project_id)
     if kb_id:
         q = q.filter(RagDocument.kb_id == kb_id)
+    if pipeline_id:
+        q = q.filter(RagDocument.pipeline_id == pipeline_id)
     return q.order_by(RagDocument.created_at.desc()).all()
 
 
@@ -162,6 +177,7 @@ async def upload_doc(
     title: str = Form(...),
     content: str = Form(""),
     kb_id: str = Form(""),
+    pipeline_id: str = Form(""),
     chunk_strategy: str = Form(""),
     chunk_size: int = Form(0),
     chunk_overlap: int = Form(-1),
@@ -187,6 +203,7 @@ async def upload_doc(
             content=content,
             source=source,
             kb_id=kb_id or None,
+            pipeline_id=pipeline_id or None,
             strategy=chunk_strategy or None,
             chunk_size=chunk_size or None,
             chunk_overlap=None if chunk_overlap < 0 else chunk_overlap,

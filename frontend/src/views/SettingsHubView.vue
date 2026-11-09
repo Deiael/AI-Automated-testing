@@ -17,6 +17,9 @@
       <el-tab-pane :label="t('settings.tabTools')" name="tools">
         <RembgView embedded />
       </el-tab-pane>
+      <el-tab-pane :label="t('settings.tabAccounts')" name="accounts">
+        <AccountsPanel />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -28,12 +31,13 @@ import { useI18n } from 'vue-i18n'
 import ProjectsView from './ProjectsView.vue'
 import EnginesView from './EnginesView.vue'
 import RembgView from './RembgView.vue'
+import AccountsPanel from '../components/AccountsPanel.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const tabs = new Set(['projects', 'engines', 'tools'])
+const tabs = new Set(['projects', 'engines', 'tools', 'accounts'])
 const tab = ref(tabs.has(String(route.query.tab)) ? String(route.query.tab) : 'projects')
 
 function onTab(name: string | number) {

@@ -53,8 +53,15 @@ def mock_test_cases(req: EngineRequest) -> dict[str, Any]:
                 "priority": "P1",
                 "tags": ["AI生成", "接口"],
                 "method": "GET",
-                "path": "/api/example",
-                "assert": {"status_code": 200},
+                "path": "/get",
+                "headers": {},
+                "body": None,
+                "assert": {
+                    "status_code": 200,
+                    "max_ms": 5000,
+                    "body_contains": ["url"],
+                },
+                "extract": [],
             }
         )
     need = "确认" not in user and "落库" not in user
@@ -75,12 +82,15 @@ def mock_execute_plan(req: EngineRequest) -> dict[str, Any]:
         path = c.get("path") or "/"
         plan.append(
             {
+                "case_id": c.get("id"),
                 "case_title": c.get("title") or "case",
+                "confidence": c.get("confidence"),
                 "method": method,
                 "url": f"{base}{path if path.startswith('/') else '/' + path}",
                 "headers": dict(req.runtime.headers or {}),
                 "body": c.get("body"),
                 "assert": c.get("assert") or {"status_code": 200},
+                "extract": c.get("extract") or [],
             }
         )
     return {"message": "执行计划已生成", "plan": plan}

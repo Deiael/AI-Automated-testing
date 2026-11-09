@@ -12,12 +12,21 @@ export const api = {
   deletePipeline: (id: string) => http.delete(`/api/pipelines/${id}`).then((r) => r.data),
   listTemplates: (pid: string) => http.get(`/api/projects/${pid}/templates`).then((r) => r.data),
   createTemplate: (pid: string, data: any) => http.post(`/api/projects/${pid}/templates`, data).then((r) => r.data),
+  updateTemplate: (pid: string, id: string, data: any) =>
+    http.put(`/api/projects/${pid}/templates/${id}`, data).then((r) => r.data),
   listEngines: () => http.get('/api/engine-profiles').then((r) => r.data),
   createEngine: (data: any) => http.post('/api/engine-profiles', data).then((r) => r.data),
   updateEngine: (id: string, data: any) => http.put(`/api/engine-profiles/${id}`, data).then((r) => r.data),
   engineHealth: (id: string) => http.get(`/api/engine-profiles/${id}/health`).then((r) => r.data),
-  listRagDocs: (pid: string, kbId?: string) =>
-    http.get(`/api/projects/${pid}/rag/docs`, { params: kbId ? { kb_id: kbId } : {} }).then((r) => r.data),
+  listRagDocs: (pid: string, kbId?: string, pipelineId?: string) =>
+    http
+      .get(`/api/projects/${pid}/rag/docs`, {
+        params: {
+          ...(kbId ? { kb_id: kbId } : {}),
+          ...(pipelineId ? { pipeline_id: pipelineId } : {}),
+        },
+      })
+      .then((r) => r.data),
   getRagDoc: (pid: string, docId: string) => http.get(`/api/projects/${pid}/rag/docs/${docId}`).then((r) => r.data),
   uploadRag: (pid: string, form: FormData) =>
     http.post(`/api/projects/${pid}/rag/docs`, form, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data),
@@ -39,11 +48,24 @@ export const api = {
   runRagEval: (pid: string, data: any) => http.post(`/api/projects/${pid}/rag/eval/run`, data).then((r) => r.data),
   createSession: (data: any) => http.post('/api/sessions', data).then((r) => r.data),
   listMessages: (sid: string) => http.get(`/api/sessions/${sid}/messages`).then((r) => r.data),
-  listTestPoints: (projectId: string) => http.get('/api/test-points', { params: { project_id: projectId } }).then((r) => r.data),
+  listTestPoints: (projectId: string, pipelineId?: string) =>
+    http.get('/api/test-points', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
   patchTestPoint: (id: string, data: any) => http.patch(`/api/test-points/${id}`, data).then((r) => r.data),
-  listTestCases: (projectId: string) => http.get('/api/test-cases', { params: { project_id: projectId } }).then((r) => r.data),
+  listTestCases: (projectId: string, pipelineId?: string) =>
+    http.get('/api/test-cases', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
   patchTestCase: (id: string, data: any) => http.patch(`/api/test-cases/${id}`, data).then((r) => r.data),
-  listRuns: (projectId: string) => http.get('/api/test-runs', { params: { project_id: projectId } }).then((r) => r.data),
+  createTestCase: (data: any) => http.post('/api/test-cases', data).then((r) => r.data),
+  deleteTestCase: (id: string) => http.delete(`/api/test-cases/${id}`).then((r) => r.data),
+  exportCases: (projectId: string, pipelineId?: string, format: 'json' | 'postman' = 'json') =>
+    http
+      .get('/api/test-cases/export', { params: { project_id: projectId, pipeline_id: pipelineId, format } })
+      .then((r) => r.data),
+  listRuns: (projectId: string, pipelineId?: string) =>
+    http.get('/api/test-runs', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
+  getDashboard: (params?: { project_id?: string; pipeline_id?: string }) =>
+    http.get('/api/analytics/dashboard', { params }).then((r) => r.data),
+  listTrackingEvents: (params?: { project_id?: string; pipeline_id?: string; event?: string }) =>
+    http.get('/api/analytics/events', { params }).then((r) => r.data),
   listReports: (runId?: string) => http.get('/api/test-reports', { params: runId ? { run_id: runId } : {} }).then((r) => r.data),
   getReport: (id: string) => http.get(`/api/test-reports/${id}`).then((r) => r.data),
   listSkills: (pid: string) => http.get(`/api/projects/${pid}/skills`).then((r) => r.data),
@@ -57,6 +79,33 @@ export const api = {
   probeMcpServer: (pid: string, id: string) => http.post(`/api/projects/${pid}/mcp-servers/${id}/probe`).then((r) => r.data),
   callMcpTool: (pid: string, id: string, data: any) =>
     http.post(`/api/projects/${pid}/mcp-servers/${id}/call`, data).then((r) => r.data),
+  login: (data: { username: string; password: string }) => http.post('/api/auth/login', data).then((r) => r.data),
+  register: (data: { username: string; password: string; email?: string }) =>
+    http.post('/api/auth/register', data).then((r) => r.data),
+  me: () => http.get('/api/auth/me').then((r) => r.data),
+  listUsers: () => http.get('/api/auth/users').then((r) => r.data),
+  importOpenApi: (form: FormData) =>
+    http
+      .post('/api/openapi/import', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 })
+      .then((r) => r.data),
+  listApiSpecs: (projectId: string, pipelineId?: string) =>
+    http.get(`/api/projects/${projectId}/api-specs`, { params: { pipeline_id: pipelineId } }).then((r) => r.data),
+  deleteApiSpec: (id: string) => http.delete(`/api/api-specs/${id}`).then((r) => r.data),
+  getCoverage: (projectId: string, pipelineId?: string) =>
+    http.get('/api/coverage', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
+  ciRun: (data: { project_id: string; pipeline_id?: string; trigger?: string; case_ids?: string[] }) =>
+    http.post('/api/ci/run', data, { timeout: 180000 }).then((r) => r.data),
+  listSchedules: (projectId?: string, pipelineId?: string) =>
+    http.get('/api/schedules', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
+  createSchedule: (data: any) => http.post('/api/schedules', data).then((r) => r.data),
+  patchSchedule: (id: string, data: any) => http.patch(`/api/schedules/${id}`, data).then((r) => r.data),
+  deleteSchedule: (id: string) => http.delete(`/api/schedules/${id}`).then((r) => r.data),
+  runSchedule: (id: string) => http.post(`/api/schedules/${id}/run`, {}, { timeout: 180000 }).then((r) => r.data),
+  getDefectConfig: (projectId: string) => http.get(`/api/projects/${projectId}/defect-config`).then((r) => r.data),
+  putDefectConfig: (projectId: string, data: any) =>
+    http.put(`/api/projects/${projectId}/defect-config`, data).then((r) => r.data),
+  listDefects: (projectId: string, pipelineId?: string) =>
+    http.get('/api/defects', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
   listRembgModels: () => http.get('/api/tools/rembg/models').then((r) => r.data),
   removeBg: (file: File, model = 'u2netp', alphaMatting = false) => {
     const form = new FormData()
@@ -83,6 +132,9 @@ export async function streamChat(
     headers: {
       'Content-Type': 'application/json',
       'X-API-Key': localStorage.getItem('apiKey') || 'dev-key',
+      ...(localStorage.getItem('accessToken')
+        ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+        : {}),
     },
     body: JSON.stringify(body),
   })

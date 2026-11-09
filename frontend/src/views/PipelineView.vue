@@ -60,12 +60,23 @@
         </div>
       </el-form>
 
+      <OpenApiImportPanel
+        v-if="pid"
+        class="openapi-block"
+        :project-id="pid"
+        :pipeline-id="pipelineId"
+        @imported="onOpenApiImported"
+      />
+
       <div class="doc-list" v-if="docs.length">
         <div class="block-title">{{ t('pipeline.req.docs') }}</div>
         <article v-for="d in docs" :key="d.id" class="doc">
           <div>
             <strong>{{ d.title }}</strong>
-            <div class="meta">{{ d.status }} · {{ d.chunk_count }} chunks</div>
+            <div class="meta">
+              {{ d.status }} · {{ d.chunk_count }} chunks
+              <span v-if="d.pipeline_id === pipelineId"> · {{ t('pipeline.req.scoped') }}</span>
+            </div>
           </div>
           <el-button link type="danger" @click="removeDoc(d.id)">{{ t('common.delete') }}</el-button>
         </article>
@@ -98,11 +109,15 @@
         </el-button>
         <el-button link type="primary" :disabled="!draftPoints.length" @click="confirmAllPoints">{{ t('pipeline.cases.confirmAllPoints') }}</el-button>
         <el-button link type="primary" :disabled="!draftCases.length" @click="confirmAllCases">{{ t('pipeline.cases.confirmAllCases') }}</el-button>
+        <el-button :disabled="!cases.length" @click="exportCases('json')">{{ t('pipeline.cases.exportJson') }}</el-button>
+        <el-button :disabled="!cases.length" @click="exportCases('postman')">{{ t('pipeline.cases.exportPostman') }}</el-button>
       </div>
 
       <el-drawer v-model="templateDrawer" :title="t('templates.title')" size="520px">
         <TemplatesView v-if="pid" :project-id="pid" @changed="loadTemplates" />
       </el-drawer>
+
+      <CoverageBoard v-if="pid" ref="coverageRef" class="coverage-block" :project-id="pid" :pipeline-id="pipelineId" />
 
       <div class="gen-grid">
         <div class="chat-col">
@@ -127,19 +142,39 @@
             <el-button v-if="p.status !== 'CONFIRMED'" link type="primary" @click="confirmPoint(p)">{{ t('common.confirm') }}</el-button>
           </article>
 
-          <div class="block-title" style="margin-top: 18px">{{ t('pipeline.cases.cases') }} <small>{{ cases.length }}</small></div>
+          <div class="block-title" style="margin-top: 18px">
+            {{ t('pipeline.cases.cases') }}
+            <small>{{ cases.length }}</small>
+            <ConfidenceBadge v-if="cases.length" :value="avgCaseConfidence" />
+          </div>
           <article v-for="c in cases" :key="c.id" class="art-item">
             <div class="art-top">
               <strong>{{ c.title }}</strong>
-              <span class="conf">{{ Number(c.confidence || 0).toFixed(2) }}</span>
+              <ConfidenceBadge :value="c.confidence" />
             </div>
             <div class="art-meta">
               <span class="status-pill" :class="c.status === 'CONFIRMED' ? '' : 'warn'">{{ c.status }}</span>
+              <span
+                v-if="c.content_json?._skill_compliance"
+                class="skill-pill"
+                :class="(c.content_json._skill_compliance.missed || []).length ? 'warn' : 'ok'"
+              >
+                {{ skillLabel(c.content_json._skill_compliance) }}
+              </span>
             </div>
-            <el-button v-if="c.status !== 'CONFIRMED'" link type="primary" @click="confirmCase(c)">{{ t('common.confirm') }}</el-button>
+            <div class="art-actions">
+              <el-button link type="primary" @click="openCaseEditor(c)">{{ t('common.edit') }}</el-button>
+              <el-button v-if="c.status !== 'CONFIRMED'" link type="primary" @click="confirmCase(c)">{{ t('common.confirm') }}</el-button>
+              <el-button link type="primary" :loading="runningCaseId === c.id" @click="startSingleCase(c)">
+                {{ t('pipeline.cases.runOne') }}
+              </el-button>
+              <el-button link type="danger" @click="removeCase(c)">{{ t('common.delete') }}</el-button>
+            </div>
           </article>
         </aside>
       </div>
+
+      <CaseEditor v-model="caseEditorOpen" :case-row="editingCase" @saved="refreshArtifacts" />
     </section>
 
     <!-- Step 3: report -->
@@ -163,6 +198,8 @@
             v-if="runSessionId"
             :key="runSessionId"
             :session-id="runSessionId"
+            :test-case-ids="runCaseIds"
+            :initial-message="runKickoff"
             @artifact="reloadReports"
             @done="reloadReports"
           />
@@ -187,6 +224,9 @@
               <span class="status-pill">{{ rep.status }}</span>
             </div>
             <div class="summary">{{ formatSummary(rep.summary_json) }}</div>
+            <div v-if="rep.summary_json?.confidence_avg != null" class="summary-conf">
+              <ConfidenceBadge :value="rep.summary_json.confidence_avg" />
+            </div>
           </article>
           <el-empty v-if="!reports.length" :description="t('pipeline.report.noReport')" :image-size="64" />
         </aside>
@@ -194,7 +234,16 @@
 
       <div v-if="selectedReport" class="report-detail panel">
         <div class="block-title">{{ t('pipeline.report.detail') }}</div>
-        <pre>{{ JSON.stringify(selectedReport, null, 2) }}</pre>
+        <ReportViewer :report="selectedReport" />
+      </div>
+
+      <div class="ops-grid">
+        <div class="panel">
+          <SchedulePanel v-if="pid" :project-id="pid" :pipeline-id="pipelineId" @ran="reloadReports" />
+        </div>
+        <div class="panel">
+          <DefectConfigPanel v-if="pid" :project-id="pid" :pipeline-id="pipelineId" />
+        </div>
       </div>
     </section>
   </div>
@@ -204,10 +253,17 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api'
 import ChatPanel from '../components/ChatPanel.vue'
+import ConfidenceBadge from '../components/ConfidenceBadge.vue'
+import CaseEditor from '../components/CaseEditor.vue'
+import ReportViewer from '../components/ReportViewer.vue'
 import TemplatesView from './TemplatesView.vue'
+import OpenApiImportPanel from '../components/OpenApiImportPanel.vue'
+import CoverageBoard from '../components/CoverageBoard.vue'
+import SchedulePanel from '../components/SchedulePanel.vue'
+import DefectConfigPanel from '../components/DefectConfigPanel.vue'
 import { usePetStore } from '../stores/pet'
 
 type StepKey = 'req' | 'cases' | 'report'
@@ -246,16 +302,28 @@ const startingPoints = ref(false)
 const startingCases = ref(false)
 
 const runSessionId = ref('')
+const runCaseIds = ref<string[]>([])
+const runKickoff = ref('')
 const startingRun = ref(false)
+const runningCaseId = ref('')
 const runs = ref<any[]>([])
 const reports = ref<any[]>([])
 const selectedReport = ref<any>(null)
+const caseEditorOpen = ref(false)
+const editingCase = ref<any>(null)
+const coverageRef = ref<{ load: () => Promise<void> } | null>(null)
+const specsCount = ref(0)
 
 const draftPoints = computed(() => points.value.filter((p) => p.status !== 'CONFIRMED'))
 const confirmedPoints = computed(() => points.value.filter((p) => p.status === 'CONFIRMED'))
 const draftCases = computed(() => cases.value.filter((c) => c.status !== 'CONFIRMED'))
 const confirmedCases = computed(() => cases.value.filter((c) => c.status === 'CONFIRMED'))
-const canNextFromReq = computed(() => docs.value.length > 0 || !!reqContent.value.trim())
+const avgCaseConfidence = computed(() => {
+  if (!cases.value.length) return 0
+  const sum = cases.value.reduce((acc, c) => acc + Number(c.confidence || 0), 0)
+  return sum / cases.value.length
+})
+const canNextFromReq = computed(() => docs.value.length > 0 || specsCount.value > 0 || !!reqContent.value.trim())
 
 async function goStep(key: StepKey) {
   step.value = key
@@ -267,8 +335,23 @@ async function goStep(key: StepKey) {
       /* ignore */
     }
   }
-  if (key === 'cases') refreshArtifacts()
+  if (key === 'cases') {
+    refreshArtifacts()
+    coverageRef.value?.load()
+  }
   if (key === 'report') reloadReports()
+}
+
+async function onOpenApiImported() {
+  try {
+    const specs = await api.listApiSpecs(pid.value, pipelineId.value)
+    specsCount.value = specs.length
+  } catch {
+    specsCount.value += 1
+  }
+  await refreshArtifacts()
+  coverageRef.value?.load()
+  goStep('cases')
 }
 
 function onFile(f: any) {
@@ -286,6 +369,7 @@ async function uploadRequirement() {
   try {
     const form = new FormData()
     form.append('title', reqTitle.value || 'req')
+    form.append('pipeline_id', pipelineId.value)
     if (file.value) form.append('file', file.value)
     else form.append('content', reqContent.value)
     await api.uploadRag(pid.value, form)
@@ -307,12 +391,14 @@ async function removeDoc(id: string) {
 }
 
 async function loadDocs() {
-  docs.value = await api.listRagDocs(pid.value)
+  // Prefer docs bound to this pipeline so requirements don't leak across pipelines.
+  const scoped = await api.listRagDocs(pid.value, undefined, pipelineId.value)
+  docs.value = scoped.length ? scoped : await api.listRagDocs(pid.value)
 }
 
 async function refreshArtifacts() {
-  points.value = await api.listTestPoints(pid.value)
-  cases.value = await api.listTestCases(pid.value)
+  points.value = await api.listTestPoints(pid.value, pipelineId.value)
+  cases.value = await api.listTestCases(pid.value, pipelineId.value)
 }
 
 async function startPoints() {
@@ -320,6 +406,7 @@ async function startPoints() {
   try {
     const s = await api.createSession({
       project_id: pid.value,
+      pipeline_id: pipelineId.value,
       flow_type: 'TEST_POINT',
       title: '流水线-测试点',
     })
@@ -336,6 +423,7 @@ async function startCases() {
   try {
     const s = await api.createSession({
       project_id: pid.value,
+      pipeline_id: pipelineId.value,
       flow_type: 'TEST_CASE',
       title: '流水线-用例',
       template_id: templateId.value || null,
@@ -358,6 +446,46 @@ async function confirmCase(row: any) {
   await refreshArtifacts()
 }
 
+function openCaseEditor(row: any) {
+  editingCase.value = row
+  caseEditorOpen.value = true
+}
+
+async function removeCase(row: any) {
+  try {
+    await ElMessageBox.confirm(t('pipeline.cases.confirmDelete', { title: row.title }), {
+      type: 'warning',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
+    })
+  } catch {
+    return
+  }
+  await api.deleteTestCase(row.id)
+  ElMessage.success(t('pipeline.cases.deleted'))
+  await refreshArtifacts()
+}
+
+function downloadJson(filename: string, data: any) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function exportCases(format: 'json' | 'postman') {
+  const data = await api.exportCases(pid.value, pipelineId.value, format)
+  const name =
+    format === 'postman'
+      ? `${pipeline.value?.name || 'ai-test'}.postman_collection.json`
+      : `${pipeline.value?.name || 'ai-test'}-cases.json`
+  downloadJson(name, data)
+  ElMessage.success(t('pipeline.cases.exported'))
+}
+
 async function confirmAllPoints() {
   await Promise.all(draftPoints.value.map((p) => api.patchTestPoint(p.id, { status: 'CONFIRMED' })))
   ElMessage.success(t('pipeline.cases.allPointsOk'))
@@ -373,20 +501,43 @@ async function confirmAllCases() {
 async function startExecute() {
   startingRun.value = true
   try {
-    const s = await api.createSession({
-      project_id: pid.value,
-      flow_type: 'TEST_EXECUTE',
-      title: '流水线-执行',
-    })
-    runSessionId.value = s.id
+    await openExecuteSession(confirmedCases.value.map((c) => c.id), t('pipeline.report.kickoff'))
     ElMessage.success(t('pipeline.report.sessionOk'))
   } finally {
     startingRun.value = false
   }
 }
 
+async function startSingleCase(row: any) {
+  runningCaseId.value = row.id
+  try {
+    if (row.status !== 'CONFIRMED') {
+      await api.patchTestCase(row.id, { status: 'CONFIRMED' })
+      await refreshArtifacts()
+    }
+    step.value = 'report'
+    await api.patchPipeline(pipelineId.value, { step: 'report' })
+    await openExecuteSession([row.id], t('pipeline.cases.kickoffOne', { title: row.title }))
+    ElMessage.success(t('pipeline.cases.sessionOne'))
+  } finally {
+    runningCaseId.value = ''
+  }
+}
+
+async function openExecuteSession(caseIds: string[], kickoff: string) {
+  const s = await api.createSession({
+    project_id: pid.value,
+    pipeline_id: pipelineId.value,
+    flow_type: 'TEST_EXECUTE',
+    title: caseIds.length === 1 ? '流水线-单次执行' : '流水线-执行',
+  })
+  runCaseIds.value = caseIds
+  runKickoff.value = kickoff
+  runSessionId.value = s.id
+}
+
 async function reloadReports() {
-  runs.value = await api.listRuns(pid.value)
+  runs.value = await api.listRuns(pid.value, pipelineId.value)
   const all = await api.listReports()
   const runIds = new Set(runs.value.map((r) => r.id))
   reports.value = all.filter((r: any) => runIds.has(r.run_id))
@@ -398,7 +549,17 @@ function formatSummary(s: any) {
   const total = s.total ?? '-'
   const passed = s.passed ?? '-'
   const failed = s.failed ?? '-'
-  return `total ${total} · pass ${passed} · fail ${failed}`
+  const time = s.time_ms != null ? ` · ${s.time_ms}ms` : ''
+  const conf = s.confidence_avg != null ? ` · conf ${Math.round(Number(s.confidence_avg) * 100)}%` : ''
+  const mcp = s.mcp_calls != null ? ` · mcp ${s.mcp_calls}` : ''
+  return `total ${total} · pass ${passed} · fail ${failed}${time}${conf}${mcp}`
+}
+
+function skillLabel(comp: any) {
+  if (!comp) return ''
+  const missed = comp.missed || []
+  if (missed.length) return t('pipeline.cases.skillMiss', { n: missed.length })
+  return t('pipeline.cases.skillOk')
 }
 
 watch(pipelineId, async () => {
@@ -418,6 +579,12 @@ async function boot() {
     if (saved && ['req', 'cases', 'report'].includes(saved)) step.value = saved
     await loadTemplates()
     await loadDocs()
+    try {
+      const specs = await api.listApiSpecs(pid.value, pipelineId.value)
+      specsCount.value = specs.length
+    } catch {
+      specsCount.value = 0
+    }
     await refreshArtifacts()
     await reloadReports()
   } finally {
@@ -666,12 +833,34 @@ onMounted(boot)
 
 .art-meta {
   margin: 6px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.skill-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 650;
+}
+.skill-pill.ok {
+  background: rgba(47, 157, 106, 0.12);
+  color: var(--ok);
+}
+.skill-pill.warn {
+  background: rgba(201, 133, 45, 0.14);
+  color: var(--amber);
 }
 
-.conf {
-  font-family: var(--font-mono);
-  color: var(--teal-deep);
-  font-weight: 700;
+.art-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.summary-conf {
+  margin-top: 6px;
 }
 
 .mono {
@@ -697,21 +886,26 @@ onMounted(boot)
   padding: 14px;
 }
 
-.report-detail pre {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  white-space: pre-wrap;
-  color: var(--ink-soft);
-  max-height: 320px;
-  overflow: auto;
+.openapi-block,
+.coverage-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 @media (max-width: 1000px) {
   .steps {
     grid-template-columns: 1fr;
   }
-  .gen-grid {
+  .gen-grid,
+  .ops-grid {
     grid-template-columns: 1fr;
   }
   .stage-head {

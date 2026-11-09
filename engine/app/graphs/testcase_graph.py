@@ -8,6 +8,14 @@ from langgraph.graph import END, StateGraph
 
 from ai_test_contracts import EngineEvent, EngineRequest
 from app.config import settings
+from app.graphs.agent_utils import (
+    critique_coverage,
+    fill_gaps,
+    repair_cases,
+    schema_issues,
+    skill_compliance,
+    validate_cases,
+)
 from app.graphs.mock import mock_test_cases
 from app.graphs.state import GraphState, req_from_state
 from app.llm.provider import LlmError, MessageStreamExtractor, complete_json, resolve_api_model, stream_json
@@ -51,16 +59,7 @@ async def _draft(state: GraphState) -> dict[str, Any]:
 
 async def _validate(state: GraphState) -> dict[str, Any]:
     req = req_from_state(state)
-    required = []
-    if req.template and isinstance(req.template.fields_schema, dict):
-        required = req.template.fields_schema.get("required") or []
-    drafts = []
-    for case in state.get("drafts") or []:
-        missing = [k for k in required if not case.get(k)]
-        if missing:
-            case = {**case, "_schema_missing": missing}
-        drafts.append(case)
-    return {"drafts": drafts}
+    return {"drafts": validate_cases(req, state.get("drafts") or [])}
 
 
 def _case_payload(req: EngineRequest) -> dict[str, Any]:
@@ -90,56 +89,30 @@ async def _emit_text_tokens(text: str, *, chunk: int = 8, delay: float = 0.01) -
             await asyncio.sleep(delay)
 
 
-def _validate_cases(req: EngineRequest, cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    required = []
-    if req.template and isinstance(req.template.fields_schema, dict):
-        required = req.template.fields_schema.get("required") or []
-    drafts = []
-    for case in cases:
-        missing = [k for k in required if not case.get(k)]
-        if missing:
-            case = {**case, "_schema_missing": missing}
-        drafts.append(case)
-    return drafts
-
-
-async def _draft_stream(state: GraphState) -> AsyncIterator[EngineEvent]:
-    req = req_from_state(state)
+async def _draft_once(req: EngineRequest) -> dict[str, Any]:
     payload = _case_payload(req)
-
     if not settings.llm_enabled:
         data = mock_test_cases(req)
         data["message"] = "（Mock）" + (data.get("message") or "")
-        message = data.get("message") or "已生成测试用例"
-        async for ev in _emit_text_tokens(message):
-            yield ev
-    else:
-        extractor = MessageStreamExtractor()
-        streamed_msg = ""
-        data: dict[str, Any] = {}
-        async for kind, payload_part in stream_json(
-            TESTCASE_SYSTEM, json.dumps(payload, ensure_ascii=False), model=req.model
-        ):
-            if kind == "token":
-                delta = extractor.feed(str(payload_part))
-                if delta:
-                    streamed_msg += delta
-                    yield EngineEvent(event="token", data={"delta": delta})
-            elif kind == "result":
-                data = payload_part if isinstance(payload_part, dict) else {}
-        data = _normalize_testcase_data(req, data)
-        message = data.get("message") or streamed_msg or "已生成测试用例"
-        if not streamed_msg and message:
-            async for ev in _emit_text_tokens(message, chunk=12, delay=0):
-                yield ev
-
-    message = data.get("message") or "已生成测试用例"
-    cases = _validate_cases(req, data.get("test_cases") or [])
-    yield EngineEvent(event="message", data={"content": message})
-    for tc in cases:
-        yield EngineEvent(event="artifact", data={"kind": "test_case", "payload": tc})
-    if data.get("need_user"):
-        yield EngineEvent(event="ask_user", data={"questions": data.get("questions") or []})
+        return data
+    data: dict[str, Any] = {}
+    extractor = MessageStreamExtractor()
+    streamed_msg = ""
+    tokens: list[str] = []
+    async for kind, payload_part in stream_json(
+        TESTCASE_SYSTEM, json.dumps(payload, ensure_ascii=False), model=req.model
+    ):
+        if kind == "token":
+            delta = extractor.feed(str(payload_part))
+            if delta:
+                streamed_msg += delta
+                tokens.append(delta)
+        elif kind == "result":
+            data = payload_part if isinstance(payload_part, dict) else {}
+    data = _normalize_testcase_data(req, data)
+    data["_streamed_msg"] = streamed_msg
+    data["_tokens"] = tokens
+    return data
 
 
 async def run_testcase_stream(req: EngineRequest) -> AsyncIterator[EngineEvent]:
@@ -152,10 +125,81 @@ async def run_testcase_stream(req: EngineRequest) -> AsyncIterator[EngineEvent]:
             "model": api_model,
             "llm_enabled": settings.llm_enabled,
             "provider": "deepseek/openai-compatible",
+            "agent": "testcase_v2",
         },
     )
-    state: GraphState = {"request": req.model_dump(mode="json")}
-    state.update(await _bind_template(state))
-    async for ev in _draft_stream(state):
-        yield ev
-    yield EngineEvent(event="done", data={"finish_reason": "stop", "usage": {}})
+
+    yield EngineEvent(event="progress", data={"percent": 10, "step": "draft"})
+    data = await _draft_once(req)
+    message = data.get("message") or data.get("_streamed_msg") or "已生成测试用例"
+    tokens = data.get("_tokens") or []
+    if tokens:
+        for delta in tokens:
+            yield EngineEvent(event="token", data={"delta": delta})
+    elif message:
+        async for ev in _emit_text_tokens(message, chunk=12, delay=0):
+            yield ev
+
+    cases = validate_cases(req, data.get("test_cases") or [])
+
+    # Schema repair loop (one retry)
+    issues = schema_issues(cases)
+    if issues:
+        yield EngineEvent(
+            event="progress",
+            data={"percent": 35, "step": "schema_repair", "detail": {"issues": issues}},
+        )
+        cases = await repair_cases(req, cases, issues)
+        issues = schema_issues(cases)
+
+    # Coverage critique + gap fill
+    yield EngineEvent(event="progress", data={"percent": 55, "step": "critique"})
+    critique = critique_coverage(req, cases)
+    if not critique.get("ok"):
+        yield EngineEvent(
+            event="progress",
+            data={"percent": 70, "step": "gap_fill", "detail": critique},
+        )
+        cases = await fill_gaps(req, cases, critique)
+        critique = critique_coverage(req, cases)
+
+    compliance = skill_compliance(req, cases, "test_case")
+    yield EngineEvent(
+        event="progress",
+        data={"percent": 90, "step": "skill_check", "detail": compliance},
+    )
+
+    note_bits = [message]
+    if issues:
+        note_bits.append(f"仍有 {len(issues)} 条用例字段不完整，已标记 _schema_missing。")
+    if critique.get("uncovered_count"):
+        note_bits.append(f"覆盖缺口约 {critique['uncovered_count']} 个测试点。")
+    if compliance.get("missed"):
+        note_bits.append("Skill 可能未完全遵守：" + "、".join(compliance["missed"]))
+    elif compliance.get("followed"):
+        note_bits.append("Skill 检查通过：" + "、".join(compliance["followed"]))
+    final_msg = " ".join(note_bits)
+
+    yield EngineEvent(
+        event="message",
+        data={
+            "content": final_msg,
+            "critique": critique,
+            "skill_compliance": compliance,
+            "schema_issues": issues,
+        },
+    )
+    for tc in cases:
+        payload = {**tc, "_skill_compliance": compliance, "_critique": {"uncovered_count": critique.get("uncovered_count")}}
+        yield EngineEvent(event="artifact", data={"kind": "test_case", "payload": payload})
+    if data.get("need_user"):
+        yield EngineEvent(event="ask_user", data={"questions": data.get("questions") or []})
+    yield EngineEvent(
+        event="done",
+        data={
+            "finish_reason": "stop",
+            "usage": {},
+            "critique": critique,
+            "skill_compliance": compliance,
+        },
+    )

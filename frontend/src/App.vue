@@ -1,6 +1,7 @@
 <template>
   <el-config-provider :locale="elLocale">
-    <div class="shell">
+    <LoginView v-if="isLogin" />
+    <div v-else class="shell">
       <aside class="rail">
         <div class="brand">
           <div class="mark" aria-hidden="true">
@@ -16,6 +17,10 @@
           <router-link class="nav-item" to="/pipeline" :class="{ active: isPipeline }">
             <span class="nav-ico">◎</span>
             <span>{{ t('nav.pipeline') }}</span>
+          </router-link>
+          <router-link class="nav-item" to="/dashboard" :class="{ active: isDashboard }">
+            <span class="nav-ico">▣</span>
+            <span>{{ t('nav.dashboard') }}</span>
           </router-link>
           <router-link class="nav-item" to="/settings" :class="{ active: isSettings }">
             <span class="nav-ico">⬡</span>
@@ -59,6 +64,13 @@
               <span>{{ t('app.apiKey') }}</span>
               <input v-model="apiKey" @change="saveKey" spellcheck="false" />
             </label>
+            <div class="user-box">
+              <template v-if="authUser">
+                <span class="user-name">{{ authUser.username }}</span>
+                <el-button link type="primary" @click="logout">{{ t('auth.logout') }}</el-button>
+              </template>
+              <router-link v-else class="login-link" to="/login">{{ t('auth.login') }}</router-link>
+            </div>
           </div>
         </header>
         <main class="content">
@@ -86,33 +98,54 @@ import PetBuddy from './components/pet/PetBuddy.vue'
 import PetPlayZone from './components/pet/PetPlayZone.vue'
 import PetAdoptDialog from './components/pet/PetAdoptDialog.vue'
 import PetQuestPanel from './components/pet/PetQuestPanel.vue'
+import LoginView from './views/LoginView.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
 const { projects, currentProjectId, setCurrentProjectId, refreshProjects } = useCurrentProject()
 const pet = usePetStore()
 
+const isLogin = computed(() => route.path.startsWith('/login'))
 const isPipeline = computed(() => route.path.startsWith('/pipeline') || route.path.includes('/pipelines'))
+const isDashboard = computed(() => route.path.startsWith('/dashboard'))
 const isSettings = computed(() => route.path.startsWith('/settings') || route.path.startsWith('/projects'))
 const title = computed(() => {
   if (route.path.startsWith('/projects/') && route.params.id) return t('titles.projectDetail')
+  if (isDashboard.value) return t('titles.dashboard')
   if (isSettings.value) return t('titles.settings')
   return t('titles.pipeline')
 })
 
+const elLocale = computed(() => (locale.value === 'en-US' ? en : zhCn))
+const apiKey = ref(localStorage.getItem('apiKey') || 'dev-key')
+const adoptOpen = ref(false)
+const authUser = ref<any>(null)
+
+function readAuthUser() {
+  try {
+    authUser.value = JSON.parse(localStorage.getItem('authUser') || 'null')
+  } catch {
+    authUser.value = null
+  }
+}
+
+readAuthUser()
+
 watch(
   () => route.path,
   (path) => {
+    readAuthUser()
     if (path.startsWith('/settings') || path.startsWith('/projects')) {
       pet.completeQuest('open_settings')
     }
   },
-  { immediate: true },
 )
 
-const elLocale = computed(() => (locale.value === 'en-US' ? en : zhCn))
-const apiKey = ref(localStorage.getItem('apiKey') || 'dev-key')
-const adoptOpen = ref(false)
+function logout() {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('authUser')
+  authUser.value = null
+}
 
 function saveKey() {
   localStorage.setItem('apiKey', apiKey.value || 'dev-key')
@@ -332,6 +365,22 @@ onMounted(() => {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--ink);
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.user-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.login-link {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--teal, #128f87);
+  text-decoration: none;
 }
 
 .content {

@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dim: int = 384
 
+    # Auth
+    jwt_secret: str = "ai-test-dev-secret-change-me-32b"
+    jwt_expire_hours: int = 72
+    allow_register: bool = True
+    seed_admin_user: str = "admin"
+    seed_admin_password: str = "admin123"
+
     def ensure_dirs(self) -> None:
         Path("data").mkdir(parents=True, exist_ok=True)
         Path(self.vector_data_dir).mkdir(parents=True, exist_ok=True)

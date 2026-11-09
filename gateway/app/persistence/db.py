@@ -29,21 +29,41 @@ def init_db() -> None:
     from app.persistence import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    _sqlite_add_missing_columns()
+    _add_missing_columns()
 
 
-def _sqlite_add_missing_columns() -> None:
-    """Best-effort ALTER for existing SQLite DBs (create_all won't add columns)."""
-    if not settings.database_url.startswith("sqlite"):
-        return
-    alters = [
-        ("rag_documents", "kb_id", "VARCHAR(36)"),
-        ("rag_documents", "chunk_strategy", "VARCHAR(32) DEFAULT ''"),
-        ("rag_documents", "chunks_json", "JSON"),
-    ]
+_COLUMN_ALTERS = [
+    ("rag_documents", "kb_id", "VARCHAR(36)"),
+    ("rag_documents", "pipeline_id", "VARCHAR(36)"),
+    ("rag_documents", "chunk_strategy", "VARCHAR(32) DEFAULT ''"),
+    ("rag_documents", "chunks_json", "JSON"),
+    ("sessions", "pipeline_id", "VARCHAR(36)"),
+    ("test_points", "pipeline_id", "VARCHAR(36)"),
+    ("test_cases", "pipeline_id", "VARCHAR(36)"),
+    ("test_runs", "pipeline_id", "VARCHAR(36)"),
+    ("projects", "runtime_variables", "JSON"),
+    ("projects", "defect_config", "JSON"),
+    ("projects", "owner_user_id", "VARCHAR(36)"),
+]
+
+
+def _add_missing_columns() -> None:
+    """Best-effort ALTER — create_all will not add columns to existing tables."""
+    dialect = engine.dialect.name
     with engine.begin() as conn:
-        for table, col, decl in alters:
-            rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
-            names = {r[1] for r in rows}
-            if col not in names:
-                conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        for table, col, decl in _COLUMN_ALTERS:
+            if _has_column(conn, dialect, table, col):
+                continue
+            conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
+def _has_column(conn, dialect: str, table: str, col: str) -> bool:
+    if dialect == "sqlite":
+        rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+        return col in {r[1] for r in rows}
+    if dialect == "mysql":
+        rows = conn.exec_driver_sql(
+            f"SHOW COLUMNS FROM {table} LIKE '{col}'"
+        ).fetchall()
+        return bool(rows)
+    return True

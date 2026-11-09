@@ -92,6 +92,7 @@
         <div v-for="a in artifacts" :key="a.id" class="art">
           <span class="kind">{{ a.kind }}</span>
           <span class="name">{{ a.title }}</span>
+          <ConfidenceBadge v-if="a.confidence != null" :value="a.confidence" />
           <span class="mono">{{ a.id.slice(0, 8) }}</span>
         </div>
       </div>
@@ -116,6 +117,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api, streamChat } from '../api'
+import ConfidenceBadge from './ConfidenceBadge.vue'
 
 const { t } = useI18n()
 
@@ -124,6 +126,7 @@ const props = defineProps<{
   engineProfileId?: string
   testPointIds?: string[]
   testCaseIds?: string[]
+  initialMessage?: string
 }>()
 const emit = defineEmits<{ (e: 'artifact', payload: any): void; (e: 'done'): void }>()
 
@@ -136,7 +139,7 @@ const selectedQs = ref<Set<number>>(new Set())
 const answers = ref<Record<number, string>>({})
 const otherSelected = ref(false)
 const otherText = ref('')
-const artifacts = ref<{ id: string; kind: string; title: string }[]>([])
+const artifacts = ref<{ id: string; kind: string; title: string; confidence?: number | null }[]>([])
 const box = ref<HTMLElement>()
 const modelName = ref('')
 const llmLive = ref<boolean | null>(null)
@@ -209,6 +212,10 @@ onMounted(async () => {
   messages.value = list.map((m: any) => ({ role: m.role, content: m.content }))
   await nextTick()
   scrollBottom()
+  if (!messages.value.length && props.initialMessage) {
+    input.value = props.initialMessage
+    await send()
+  }
 })
 
 async function send() {
@@ -248,8 +255,18 @@ async function send() {
           const kind = ev.data?.kind
           const payload = ev.data?.payload || {}
           const id = ev.data?.artifact_id || ''
+          const conf =
+            ev.data?.confidence ??
+            payload.confidence ??
+            payload.summary?.confidence_avg ??
+            null
           if (id) {
-            artifacts.value.push({ id, kind, title: payload.title || kind })
+            artifacts.value.push({
+              id,
+              kind,
+              title: payload.title || payload.summary?.scope || kind,
+              confidence: conf == null ? null : Number(conf),
+            })
             emit('artifact', { ...ev.data })
           }
         }

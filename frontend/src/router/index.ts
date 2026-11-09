@@ -7,13 +7,17 @@ import McpView from '../views/McpView.vue'
 import PipelineHubView from '../views/PipelineHubView.vue'
 import PipelineView from '../views/PipelineView.vue'
 import SettingsHubView from '../views/SettingsHubView.vue'
+import DashboardView from '../views/DashboardView.vue'
+import LoginView from '../views/LoginView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/login', component: LoginView, meta: { public: true, hideShell: true } },
     { path: '/', redirect: '/pipeline' },
     { path: '/pipeline', component: PipelineHubView },
     { path: '/pipelines/:pipelineId', component: PipelineView },
+    { path: '/dashboard', component: DashboardView },
     { path: '/settings', component: SettingsHubView },
     { path: '/projects', redirect: { path: '/settings', query: { tab: 'projects' } } },
     { path: '/settings/engines', redirect: { path: '/settings', query: { tab: 'engines' } } },
@@ -34,6 +38,12 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta.public) return true
+  // JWT is optional: API Key still authenticates local/CI clients.
+  return true
 })
 
 export default router

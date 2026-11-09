@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EngineProfileIn(BaseModel):
@@ -25,12 +25,20 @@ class ProjectIn(BaseModel):
     description: str = ""
     engine_profile_id: Optional[str] = None
     runtime_base_url: str = ""
-    runtime_headers: dict[str, str] = Field(default_factory=dict)
+    runtime_headers: dict[str, Any] = Field(default_factory=dict)
+    runtime_variables: dict[str, Any] = Field(default_factory=dict)
+    defect_config: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("runtime_headers", "runtime_variables", "defect_config", mode="before")
+    @classmethod
+    def _none_dict(cls, v: Any) -> dict[str, Any]:
+        return v or {}
 
 
 class ProjectOut(ProjectIn):
     id: str
-    status: str
+    status: str = "active"
+    owner_user_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -54,6 +62,7 @@ class RagDocOut(BaseModel):
     id: str
     project_id: str
     kb_id: Optional[str] = None
+    pipeline_id: Optional[str] = None
     title: str
     source: str
     status: str
@@ -117,6 +126,7 @@ class SessionCreate(BaseModel):
     title: str = ""
     template_id: Optional[str] = None
     engine_profile_id: Optional[str] = None
+    pipeline_id: Optional[str] = None
 
 
 class SessionOut(BaseModel):
@@ -154,6 +164,15 @@ class ArtifactPatch(BaseModel):
     title: Optional[str] = None
     content_json: Optional[dict[str, Any]] = None
     status: Optional[str] = None
+
+
+class TestCaseCreate(BaseModel):
+    project_id: str
+    pipeline_id: Optional[str] = None
+    template_id: Optional[str] = None
+    title: str = "未命名用例"
+    content_json: dict[str, Any] = Field(default_factory=dict)
+    status: str = "DRAFT"
 
 
 class TestRunCreate(BaseModel):

@@ -120,6 +120,7 @@ class RagService:
         content: str,
         source: str = "",
         kb_id: str | None = None,
+        pipeline_id: str | None = None,
         strategy: str | None = None,
         chunk_size: int | None = None,
         chunk_overlap: int | None = None,
@@ -138,6 +139,7 @@ class RagService:
 
         doc = RagDocument(
             project_id=project_id,
+            pipeline_id=pipeline_id,
             kb_id=kb.id,
             title=title,
             content=content,
@@ -188,24 +190,41 @@ class RagService:
         query: str,
         top_k: int | None = None,
         kb_id: str | None = None,
+        pipeline_id: str | None = None,
         db: Session | None = None,
     ):
         k = top_k or settings.rag_top_k
+        allow_docs: set[str] | None = None
+        if db is not None and pipeline_id:
+            # Prefer docs stamped with this pipeline; if none, fall back to project-wide.
+            scoped = (
+                db.query(RagDocument.id)
+                .filter(RagDocument.project_id == project_id, RagDocument.pipeline_id == pipeline_id)
+                .all()
+            )
+            if scoped:
+                allow_docs = {r[0] for r in scoped}
+
+        async def _filter(hits):
+            if not allow_docs:
+                return hits
+            return [h for h in hits if h.doc_id in allow_docs]
+
         if kb_id:
-            hits = await self.store.search(kb_id, query, k)
+            hits = await _filter(await self.store.search(kb_id, query, max(k * 3, k)))
             for h in hits:
                 h.kb_id = kb_id
-            return hits
+            return hits[:k]
         if db is None:
-            # legacy: search using project_id key (old mvp files)
             return await self.store.search(project_id, query, k)
 
         kbs = db.query(RagKnowledgeBase).filter(RagKnowledgeBase.project_id == project_id).all()
         if not kbs:
-            return await self.store.search(project_id, query, k)
+            return await _filter(await self.store.search(project_id, query, max(k * 3, k)))[:k]
         merged = []
         for kb in kbs:
-            merged.extend(await self.store.search(kb.id, query, k))
+            merged.extend(await self.store.search(kb.id, query, max(k * 2, k)))
+        merged = await _filter(merged)
         merged.sort(key=lambda x: x.score, reverse=True)
         return merged[:k]
 

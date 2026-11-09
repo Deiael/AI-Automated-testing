@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_api_key
+from app.api.deps import AuthUser, get_current_user, require_api_key
 from app.persistence.db import get_db
 from app.persistence.models import CaseTemplate, Project
 from app.schemas.dto import ProjectIn, ProjectOut, TemplateIn, TemplateOut
@@ -17,8 +17,9 @@ def list_projects(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ProjectOut)
-def create_project(body: ProjectIn, db: Session = Depends(get_db)):
-    row = Project(**body.model_dump())
+def create_project(body: ProjectIn, db: Session = Depends(get_db), auth: AuthUser = Depends(get_current_user)):
+    data = body.model_dump()
+    row = Project(**data, owner_user_id=auth.user.id if auth.user else None)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -36,6 +37,10 @@ def create_project(body: ProjectIn, db: Session = Depends(get_db)):
                 "priority": {"type": "string"},
                 "method": {"type": "string"},
                 "path": {"type": "string"},
+                "headers": {"type": "object"},
+                "body": {},
+                "assert": {"type": "object"},
+                "extract": {"type": "array"},
             },
         },
         prompt_hint="接口测试标准模板",
@@ -58,7 +63,10 @@ def update_project(project_id: str, body: ProjectIn, db: Session = Depends(get_d
     row = db.get(Project, project_id)
     if not row:
         raise HTTPException(404, "project not found")
-    for k, v in body.model_dump().items():
+    payload = body.model_dump()
+    if not payload.get("defect_config"):
+        payload.pop("defect_config", None)
+    for k, v in payload.items():
         setattr(row, k, v)
     db.commit()
     db.refresh(row)

@@ -30,6 +30,12 @@ Design docs: [`docs/DEVELOPMENT.en.md`](./docs/DEVELOPMENT.en.md) · [`docs/DEVE
 - **True SSE streaming**: tokens stream live during chat generation
 - **Clarification cards**: when the engine asks for more info, pick cards (or “Other”) and reply
 - **i18n**: language toggle (top-right), preference in `localStorage`
+- **Case confidence board**: gateway scores cases on generation, tracks single-case and suite runs, and summarizes per-requirement (pipeline) on the Confidence dashboard
+- **Editable / exportable cases**: edit method/path/headers/body/asserts/extract in the pipeline; export JSON or Postman Collection
+- **Execution reports**: status / JSONPath / body-contains / latency asserts, `{{vars}}` across steps, failure details with request/response
+- **Real MCP calls**: cases can declare `mcp_before` / `mcp_after`; engine invokes them at run time
+- **Agent loops**: schema repair, coverage critique + gap fill; Skill compliance stamped on artifacts
+- **Visual template schema** + **pipeline-scoped RAG** so requirements don’t leak across pipelines
 
 ### RAG (project knowledge)
 

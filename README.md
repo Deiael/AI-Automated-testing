@@ -5,9 +5,60 @@
 **AI 自动化接口测试平台**：三层架构（应用层 / 网关层 / 引擎层），支持项目维度 RAG、Skill、MCP、用例模板、多引擎切换、SSE 真流式生成，以及可领养互动的 Q 版宠物伙伴。
 
 ## 页面
-![Uploading da419ecc8579e50884f90a053d2dadb7.png…]()
 
+| 测试流水线 | 置信度看板 |
+| --- | --- |
+| ![测试流水线](docs/screenshots/pipeline.png) | ![置信度看板](docs/screenshots/confidence-dashboard.png) |
 
+| 配置中心 · 项目空间 | 配置中心 · 引擎 |
+| --- | --- |
+| ![项目空间](docs/screenshots/settings-projects.png) | ![引擎配置](docs/screenshots/settings-engines.png) |
+
+## 流程图
+
+![AI-Test 工作流](docs/screenshots/flow.svg)
+
+```mermaid
+flowchart LR
+  subgraph App["应用层 Vue :5190"]
+    Login[登录 JWT / API Key]
+    Settings[配置中心]
+    Pipeline[测试流水线]
+    Board[置信度看板]
+  end
+
+  subgraph Gateway["网关 FastAPI :8100"]
+    Auth[账号体系]
+    Spec[OpenAPI 导入]
+    Cov[覆盖率]
+    Rag[RAG / Skill / MCP]
+    Ci[CI / 定时回归]
+    Defect[缺陷联动]
+    DB[(SQLite)]
+  end
+
+  subgraph Engine["引擎 LangGraph :8200"]
+    Points[测试点 Agent]
+    Cases[用例 Agent]
+    Exec[HTTP / MCP 执行]
+    LLM[DeepSeek / OpenAI]
+  end
+
+  Login --> Settings
+  Settings --> Pipeline
+  Pipeline -->|需求或 OpenAPI| Spec
+  Spec --> Points
+  Points --> Cases
+  Cases --> Cov
+  Pipeline --> Exec
+  Ci --> Exec
+  Exec -->|失败| Defect
+  Defect -->|GitHub Issue / Webhook| Ext[外部缺陷系统]
+  Pipeline --> Board
+  Gateway --> Engine
+  Engine --> LLM
+  Auth --> DB
+```
 
 ## 架构一览
 
@@ -35,6 +86,17 @@
 - **SSE 真流式**：对话生成按 token 实时回传，不再假回放
 - **澄清卡片**：引擎「需要你补充」时以可选卡片展示，支持多选填写与「其他：自己补充」
 - **中英文界面**：右上角一键切换，偏好写入 `localStorage`
+- **用例置信度与看板**：生成时网关打分并埋点；用例列表展示置信度；单次/整批执行携带置信度；左侧「置信度看板」按单次需求（流水线）汇总
+- **用例可编辑 / 导出**：流水线内编辑 method/path/headers/body/断言/变量提取；导出 JSON 或 Postman Collection
+- **执行报告**：状态码 / JSONPath / 响应包含 / 耗时断言，步骤间 `{{变量}}` 传递，报告页展示失败详情与请求响应
+- **MCP 真调用**：用例可配 `mcp_before` / `mcp_after`，执行期由引擎真实调用（造数 / 清库 / 验证码）
+- **Agent 循环**：用例生成含 schema 修复、覆盖率自检与缺口补齐；Skill 合规结果写回产物
+- **模板可视化 Schema**：字段增删、类型、必填；流水线需求文档按 `pipeline_id` 隔离检索
+- **OpenAPI 一键导入**：粘贴 / 上传 / URL 导入规范，自动生成测试点与用例
+- **覆盖率看板**：接口路径、需求文档 vs 已生成用例，标出缺口
+- **CI / 定时回归**：`POST /api/ci/run`、hourly/daily/weekly 调度；GitHub Actions 可远程触发
+- **登录态与账号**：JWT 注册/登录（种子账号 `admin` / `admin123`），本地仍可用 API Key
+- **缺陷联动**：用例失败时自动开 GitHub Issue 或推送 Webhook（同用例去重）
 
 ### RAG（项目知识库）
 

@@ -242,7 +242,8 @@ MVP 执行侧可先：引擎根据用例生成「可执行请求草案」并对 
   },
   "runtime": {
     "base_url": "https://api.example.com",
-    "headers": {}
+    "headers": {},
+    "variables": {}
   },
   "options": {
     "temperature": 0.2,

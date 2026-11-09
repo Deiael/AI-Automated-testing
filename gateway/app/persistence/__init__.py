@@ -1,5 +1,7 @@
 from app.persistence.models import (
+    ApiSpec,
     CaseTemplate,
+    DefectIssue,
     EngineProfile,
     Message,
     Pipeline,
@@ -9,15 +11,20 @@ from app.persistence.models import (
     RagDocument,
     RagEvalCase,
     RagKnowledgeBase,
+    ScheduleJob,
     Session,
     TestCase,
     TestPoint,
     TestReport,
     TestRun,
+    TrackingEvent,
+    User,
 )
 
 __all__ = [
+    "ApiSpec",
     "CaseTemplate",
+    "DefectIssue",
     "EngineProfile",
     "Message",
     "Pipeline",
@@ -27,9 +34,12 @@ __all__ = [
     "RagDocument",
     "RagEvalCase",
     "RagKnowledgeBase",
+    "ScheduleJob",
     "Session",
     "TestCase",
     "TestPoint",
     "TestReport",
     "TestRun",
+    "TrackingEvent",
+    "User",
 ]

@@ -34,6 +34,10 @@ class Project(Base):
     engine_profile_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("engine_profiles.id"), nullable=True)
     runtime_base_url: Mapped[str] = mapped_column(String(512), default="")
     runtime_headers: Mapped[dict] = mapped_column(JSON, default=dict)
+    runtime_variables: Mapped[dict] = mapped_column(JSON, default=dict)
+    # defect linkage: {provider: github|gitlab|webhook, token, repo, webhook_url, enabled}
+    defect_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    owner_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -86,6 +90,7 @@ class RagDocument(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
     kb_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("rag_knowledge_bases.id"), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(256))
     source: Mapped[str] = mapped_column(String(512), default="")
@@ -118,6 +123,7 @@ class Session(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("pipelines.id"), index=True, nullable=True)
     flow_type: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default="CREATED")
     title: Mapped[str] = mapped_column(String(256), default="")
@@ -142,6 +148,7 @@ class TestPoint(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     project_id: Mapped[str] = mapped_column(String(36), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     title: Mapped[str] = mapped_column(String(256))
     content_json: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -155,6 +162,7 @@ class TestCase(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     project_id: Mapped[str] = mapped_column(String(36), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     test_point_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
@@ -170,6 +178,7 @@ class TestRun(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     project_id: Mapped[str] = mapped_column(String(36), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     case_ids_json: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(32), default="PENDING")
@@ -185,6 +194,23 @@ class TestReport(Base):
     detail_json: Mapped[dict] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(32), default="DONE")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TrackingEvent(Base):
+    """Product analytics / confidence 埋点."""
+
+    __tablename__ = "tracking_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    event: Mapped[str] = mapped_column(String(64), index=True)
+    project_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    session_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    run_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    case_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    props_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
 class ProjectSkill(Base):
@@ -215,4 +241,68 @@ class ProjectMcpServer(Base):
     tools_cache_json: Mapped[list] = mapped_column(JSON, default=list)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(256), default="")
+    password_hash: Mapped[str] = mapped_column(String(256))
+    role: Mapped[str] = mapped_column(String(32), default="user")  # admin | user
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ApiSpec(Base):
+    """Imported OpenAPI / Swagger document used for import + coverage."""
+
+    __tablename__ = "api_specs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    title: Mapped[str] = mapped_column(String(256), default="OpenAPI")
+    version: Mapped[str] = mapped_column(String(64), default="")
+    source: Mapped[str] = mapped_column(String(512), default="")
+    raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    operations_json: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ScheduleJob(Base):
+    """Cron-like regression schedule for a pipeline."""
+
+    __tablename__ = "schedule_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    pipeline_id: Mapped[str] = mapped_column(String(36), index=True)
+    name: Mapped[str] = mapped_column(String(128), default="regression")
+    # simple presets: hourly | daily | weekly | or cron "m h dom mon dow"
+    cron: Mapped[str] = mapped_column(String(64), default="daily")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_status: Mapped[str] = mapped_column(String(32), default="")
+    last_summary_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DefectIssue(Base):
+    __tablename__ = "defect_issues"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    run_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    case_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    case_title: Mapped[str] = mapped_column(String(256), default="")
+    provider: Mapped[str] = mapped_column(String(32), default="github")
+    external_id: Mapped[str] = mapped_column(String(128), default="")
+    external_url: Mapped[str] = mapped_column(String(1024), default="")
+    title: Mapped[str] = mapped_column(String(512), default="")
+    status: Mapped[str] = mapped_column(String(32), default="open")
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

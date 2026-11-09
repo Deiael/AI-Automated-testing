@@ -5,6 +5,20 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: "AI-Test project id for remote regression (optional)"
+        required: false
+        default: ""
+      pipeline_id:
+        description: "AI-Test pipeline id (optional)"
+        required: false
+        default: ""
+      gateway_url:
+        description: "Gateway base URL (e.g. https://gateway.example.com)"
+        required: false
+        default: ""
 
 jobs:
   frontend:
@@ -40,3 +54,24 @@ jobs:
           python -c "from ai_test_contracts import EngineRequest, EngineEvent; print('contracts ok')"
           cd engine && python -c "from app.config import settings; print('engine', settings.openai_model)"
           cd ../gateway && python -c "from app.config import settings; print('gateway ok')"
+          cd ../gateway && python -c "from app.services.openapi_import import parse_openapi_text, extract_operations; from app.services.coverage import coverage_board; print('features ok')"
+
+  regression:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.project_id != '' && (inputs.gateway_url != '' || vars.AI_TEST_GATEWAY_URL != '') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger AI-Test CI run
+        env:
+          GATEWAY_URL: ${{ inputs.gateway_url || vars.AI_TEST_GATEWAY_URL }}
+          API_KEY: ${{ secrets.AI_TEST_API_KEY }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          PIPELINE_ID: ${{ inputs.pipeline_id }}
+        run: |
+          set -euo pipefail
+          BODY=$(jq -n --arg p "$PROJECT_ID" --arg pl "$PIPELINE_ID" '{project_id:$p, pipeline_id:(if $pl=="" then null else $pl end), trigger:"github-actions"}')
+          RESP=$(curl -sS -X POST "${GATEWAY_URL%/}/api/ci/run" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${API_KEY}" \
+            -d "$BODY")
+          echo "$RESP" | tee regression.json
+          echo "$RESP" | jq -e '.summary.failed == 0' >/dev/null

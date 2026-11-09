@@ -26,7 +26,7 @@ TESTCASE_SYSTEM = """你是资深接口测试用例专家，底层模型为 Deep
 3) 若信息不足，need_user=true
 4) 若用户询问模型身份，在 message 中明确说明：当前由 DeepSeek deepseek-chat 驱动；test_cases 可为空
 5) 若上下文含 Skill（标题以 Skill · 开头），必须遵循其中的指令与约束
-6) 若上下文含 MCP tools 清单，生成用例时可参考工具能力描述（如鉴权探测、数据准备），但仍只输出用例 JSON
+6) 若上下文含 MCP tools，可为用例附加 mcp_before/mcp_after（造数/清库/验证码），执行期会真实调用
 只输出 JSON 对象（message 必须是第一个字段，便于流式展示）：
 {
   "message": "给用户的中文说明",
@@ -40,8 +40,17 @@ TESTCASE_SYSTEM = """你是资深接口测试用例专家，底层模型为 Deep
       "tags":["AI生成"],
       "method":"GET|POST|PUT|DELETE",
       "path":"/api/...",
+      "headers": {},
       "body": null,
-      "assert": {"status_code": 200}
+      "assert": {
+        "status_code": 200,
+        "max_ms": 3000,
+        "body_contains": [],
+        "jsonpath": [{"path":"$.code","equals":0}]
+      },
+      "extract": [{"path":"$.data.token","as":"token"}],
+      "mcp_before": [{"server_name":"...", "tool":"create_user", "arguments":{}, "as":"user"}],
+      "mcp_after": [{"server_name":"...", "tool":"cleanup", "arguments":{}}]
     }
   ],
   "need_user": false,
@@ -49,23 +58,27 @@ TESTCASE_SYSTEM = """你是资深接口测试用例专家，底层模型为 Deep
 }
 """
 
-EXECUTE_SYSTEM = """你是接口测试执行规划助手。根据用例与 runtime.base_url 规划可执行 HTTP 请求。
+EXECUTE_SYSTEM = """你是接口测试执行规划助手。优先沿用用例里已编辑的 method/path/headers/body/assert/extract/mcp_before/mcp_after。
 要求：
-1) url 必须是绝对地址（base_url + path）
-2) method/headers/body/assert 齐全
-3) 若上下文含 Skill 指令，规划时遵循其约束
-4) 若上下文含 MCP tools，可在 message 中提示相关工具，但 plan 仍只包含 HTTP 步骤
+1) url 必须是绝对地址（runtime.base_url + path）；可用 {{变量}}，变量来自 runtime.variables、extract 或 MCP as
+2) 保留用例 assert 与 extract；保留 mcp_before/mcp_after（执行引擎会真实调用 MCP）
+3) case_id 必须原样带回
+4) 若上下文含 Skill 指令，规划时遵循其约束
 只输出 JSON 对象（message 必须是第一个字段，便于流式展示）：
 {
   "message": "给用户的中文说明",
   "plan": [
     {
+      "case_id":"原用例 id",
       "case_title":"...",
       "method":"GET",
       "url":"https://example.com/api/...",
       "headers": {},
       "body": null,
-      "assert": {"status_code": 200}
+      "assert": {"status_code": 200},
+      "extract": [],
+      "mcp_before": [],
+      "mcp_after": []
     }
   ]
 }

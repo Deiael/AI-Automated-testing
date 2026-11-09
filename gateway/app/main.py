@@ -5,10 +5,27 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import artifacts, engines, mcp_servers, pipelines, projects, rag, sessions, skills, tools
+from app.api import (
+    analytics,
+    artifacts,
+    auth,
+    ci,
+    coverage,
+    engines,
+    mcp_servers,
+    openapi_specs,
+    pipelines,
+    projects,
+    rag,
+    sessions,
+    skills,
+    tools,
+)
 from app.bootstrap import seed_default_engine
 from app.config import settings
 from app.persistence.db import SessionLocal, init_db
+from app.services.auth import seed_admin
+from app.services.scheduler import shutdown_scheduler, start_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -21,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(pipelines.router)
 app.include_router(engines.router)
@@ -30,6 +48,10 @@ app.include_router(mcp_servers.router)
 app.include_router(sessions.router)
 app.include_router(artifacts.router)
 app.include_router(tools.router)
+app.include_router(analytics.router)
+app.include_router(openapi_specs.router)
+app.include_router(coverage.router)
+app.include_router(ci.router)
 
 
 @app.on_event("startup")
@@ -39,8 +61,15 @@ def on_startup() -> None:
     db = SessionLocal()
     try:
         seed_default_engine(db)
+        seed_admin(db)
     finally:
         db.close()
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    shutdown_scheduler()
 
 
 @app.get("/health")
