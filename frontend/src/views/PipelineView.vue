@@ -325,14 +325,16 @@ const runSessionId = ref('')
 const runCaseIds = ref<string[]>([])
 const runKickoff = ref('')
 const startingRun = ref(false)
+type ExecEnv = { id: string; name: string; base_url?: string; is_default?: boolean }
+
 const execProject = ref<any>(null)
 const runEnvId = ref('')
-const execEnvs = computed(() => {
+const execEnvs = computed<ExecEnv[]>(() => {
   const p = execProject.value
   if (!p) return []
   const listed = Array.isArray(p.runtime_envs) ? p.runtime_envs.filter((e: any) => e && (e.id || e.name)) : []
   if (listed.length) {
-    return listed.map((e: any) => ({ ...e, id: e.id || e.name }))
+    return listed.map((e: any) => ({ ...e, id: String(e.id || e.name), name: String(e.name || e.id) }))
   }
   return [{ id: 'default', name: 'default', base_url: p.runtime_base_url || '', is_default: true }]
 })
