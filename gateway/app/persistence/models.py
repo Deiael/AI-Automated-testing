@@ -35,6 +35,8 @@ class Project(Base):
     runtime_base_url: Mapped[str] = mapped_column(String(512), default="")
     runtime_headers: Mapped[dict] = mapped_column(JSON, default=dict)
     runtime_variables: Mapped[dict] = mapped_column(JSON, default=dict)
+    # [{id, name, base_url, headers, variables, timeout_sec, is_default}]
+    runtime_envs: Mapped[list] = mapped_column(JSON, default=list)
     # defect linkage: {provider: github|gitlab|webhook, token, repo, webhook_url, enabled}
     defect_config: Mapped[dict] = mapped_column(JSON, default=dict)
     owner_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
@@ -52,6 +54,8 @@ class Pipeline(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
     step: Mapped[str] = mapped_column(String(32), default="req")  # req | cases | report
+    # api | version_regression | smoke | system  (smoke/system reserved)
+    kind: Mapped[str] = mapped_column(String(32), default="api")
     status: Mapped[str] = mapped_column(String(32), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -287,6 +291,25 @@ class ScheduleJob(Base):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_status: Mapped[str] = mapped_column(String(32), default="")
     last_summary_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class VersionBaseline(Base):
+    """Saved old-version snapshot used for version regression (predict vs localize)."""
+
+    __tablename__ = "version_baselines"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), index=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    name: Mapped[str] = mapped_column(String(128), default="v1")
+    note: Mapped[str] = mapped_column(Text, default="")
+    spec_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    spec_title: Mapped[str] = mapped_column(String(256), default="")
+    operations_json: Mapped[list] = mapped_column(JSON, default=list)
+    cases_json: Mapped[list] = mapped_column(JSON, default=list)
+    report_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    runtime_base_url: Mapped[str] = mapped_column(String(512), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

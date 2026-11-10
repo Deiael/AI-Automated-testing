@@ -7,6 +7,7 @@ from app.api.deps import AuthUser, get_current_user, require_api_key
 from app.persistence.db import get_db
 from app.persistence.models import CaseTemplate, Project
 from app.schemas.dto import ProjectIn, ProjectOut, TemplateIn, TemplateOut
+from app.services.runtime_env import apply_default_to_project, upsert_default_from_legacy
 
 router = APIRouter(prefix="/api/projects", tags=["projects"], dependencies=[Depends(require_api_key)])
 
@@ -20,6 +21,9 @@ def list_projects(db: Session = Depends(get_db)):
 def create_project(body: ProjectIn, db: Session = Depends(get_db), auth: AuthUser = Depends(get_current_user)):
     data = body.model_dump()
     row = Project(**data, owner_user_id=auth.user.id if auth.user else None)
+    envs = upsert_default_from_legacy(row.runtime_envs or [], row)
+    row.runtime_envs = envs
+    apply_default_to_project(row, envs)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -66,8 +70,12 @@ def update_project(project_id: str, body: ProjectIn, db: Session = Depends(get_d
     payload = body.model_dump()
     if not payload.get("defect_config"):
         payload.pop("defect_config", None)
+    envs = upsert_default_from_legacy(payload.get("runtime_envs") or [], row)
+    payload["runtime_envs"] = envs
     for k, v in payload.items():
         setattr(row, k, v)
+    if envs:
+        apply_default_to_project(row, envs)
     db.commit()
     db.refresh(row)
     return row

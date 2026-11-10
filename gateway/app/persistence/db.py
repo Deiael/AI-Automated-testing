@@ -44,6 +44,8 @@ _COLUMN_ALTERS = [
     ("projects", "runtime_variables", "JSON"),
     ("projects", "defect_config", "JSON"),
     ("projects", "owner_user_id", "VARCHAR(36)"),
+    ("projects", "runtime_envs", "JSON"),
+    ("pipelines", "kind", "VARCHAR(32) DEFAULT 'api'"),
 ]
 
 

@@ -23,6 +23,10 @@
       </div>
     </header>
 
+    <div v-if="summary.env_name || summary.base_url" class="env-line">
+      {{ summary.env_name || 'env' }} · {{ summary.base_url }}
+    </div>
+
     <div v-if="summary.failed_titles?.length" class="fail-strip">
       {{ t('report.failedList') }}：{{ summary.failed_titles.join(' · ') }}
     </div>
@@ -184,6 +188,11 @@ function fmt(v: any) {
 }
 .kpi.fail strong {
   color: var(--rose);
+}
+.env-line {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .fail-strip {
   padding: 8px 12px;

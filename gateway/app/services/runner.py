@@ -29,6 +29,7 @@ async def run_regression(
     case_ids: list[str] | None = None,
     engine_profile_id: str | None = None,
     trigger: str = "manual",
+    env_id: str | None = None,
 ) -> dict[str, Any]:
     project = db.get(Project, project_id)
     if not project:
@@ -55,6 +56,9 @@ async def run_regression(
     db.commit()
     db.refresh(run_row)
 
+    from app.services.runtime_env import resolve_env
+
+    env = resolve_env(project, env_id)
     artifacts = {"test_cases": [engine_artifact(c) for c in cases], "test_points": []}
     req = EngineRequest(
         request_id=str(uuid.uuid4()),
@@ -71,9 +75,12 @@ async def run_regression(
         template=None,
         artifacts=artifacts,
         runtime=RuntimeConfig(
-            base_url=project.runtime_base_url or "",
-            headers=project.runtime_headers or {},
-            variables=project.runtime_variables or {},
+            base_url=env.get("base_url") or "",
+            headers=env.get("headers") or {},
+            variables=env.get("variables") or {},
+            env_id=str(env.get("id") or ""),
+            env_name=str(env.get("name") or ""),
+            timeout_sec=float(env.get("timeout_sec") or 30),
         ),
     )
 

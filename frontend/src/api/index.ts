@@ -106,6 +106,20 @@ export const api = {
     http.put(`/api/projects/${projectId}/defect-config`, data).then((r) => r.data),
   listDefects: (projectId: string, pipelineId?: string) =>
     http.get('/api/defects', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
+  listBaselines: (projectId: string, pipelineId?: string) =>
+    http.get('/api/regression/baselines', { params: { project_id: projectId, pipeline_id: pipelineId } }).then((r) => r.data),
+  createBaseline: (data: { project_id: string; pipeline_id?: string; name?: string; note?: string }) =>
+    http.post('/api/regression/baselines', data).then((r) => r.data),
+  deleteBaseline: (id: string) => http.delete(`/api/regression/baselines/${id}`).then((r) => r.data),
+  regressionPlan: (data: { project_id: string; pipeline_id?: string; baseline_id: string }) =>
+    http.post('/api/regression/plan', data).then((r) => r.data),
+  regressionGenerate: (data: {
+    project_id: string
+    pipeline_id?: string
+    baseline_id: string
+    confirm?: boolean
+    execute?: boolean
+  }) => http.post('/api/regression/generate', data, { timeout: 180000 }).then((r) => r.data),
   listRembgModels: () => http.get('/api/tools/rembg/models').then((r) => r.data),
   removeBg: (file: File, model = 'u2netp', alphaMatting = false) => {
     const form = new FormData()
@@ -124,7 +138,13 @@ export const api = {
 
 export async function streamChat(
   sessionId: string,
-  body: { message: string; engine_profile_id?: string; test_point_ids?: string[]; test_case_ids?: string[] },
+  body: {
+    message: string
+    engine_profile_id?: string
+    test_point_ids?: string[]
+    test_case_ids?: string[]
+    env_id?: string
+  },
   onEvent: (ev: { event: string; data: any }) => void,
 ) {
   const resp = await fetch(`/api/sessions/${sessionId}/chat`, {

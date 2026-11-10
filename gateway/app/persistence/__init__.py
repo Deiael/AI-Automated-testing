@@ -19,6 +19,7 @@ from app.persistence.models import (
     TestRun,
     TrackingEvent,
     User,
+    VersionBaseline,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     "TestRun",
     "TrackingEvent",
     "User",
+    "VersionBaseline",
 ]

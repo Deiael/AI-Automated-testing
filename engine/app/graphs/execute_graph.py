@@ -126,7 +126,8 @@ async def _call_http(state: GraphState) -> dict[str, Any]:
 
     results: list[dict[str, Any]] = []
     mcp_log: list[dict[str, Any]] = []
-    timeout = httpx.Timeout(30.0)
+    timeout_sec = float(runtime.get("timeout_sec") or 30)
+    timeout = httpx.Timeout(timeout_sec)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         for step in state.get("drafts") or []:
             before = step.get("mcp_before") or []
@@ -171,6 +172,7 @@ async def _call_http(state: GraphState) -> dict[str, Any]:
 
 
 async def _summarize(state: GraphState) -> dict[str, Any]:
+    req = req_from_state(state)
     details = state.get("progress") or []
     total = len(details)
     passed = sum(1 for d in details if d.get("ok"))
@@ -187,12 +189,18 @@ async def _summarize(state: GraphState) -> dict[str, Any]:
             "failed_titles": failed_titles,
             "mcp_calls": len(mcp_log),
             "mcp_failed": mcp_fail,
+            "env_name": req.runtime.env_name,
+            "env_id": req.runtime.env_id,
+            "base_url": req.runtime.base_url,
         },
         "details": details,
         "variables": state.get("variables") or {},
         "mcp_log": mcp_log,
     }
+    env_label = req.runtime.env_name or req.runtime.base_url or ""
     msg = f"执行完成：通过 {passed}/{total}，耗时 {elapsed}ms"
+    if env_label:
+        msg += f"；环境 {env_label}"
     if failed_titles:
         msg += "；失败：" + "、".join(str(t) for t in failed_titles[:5] if t)
     if mcp_log:
@@ -209,6 +217,17 @@ async def _emit_text_tokens(text: str, *, chunk: int = 8, delay: float = 0.01) -
 
 async def _plan_stream(state: GraphState) -> AsyncIterator[EngineEvent]:
     req = req_from_state(state)
+    direct = _steps_from_cases(req)
+    if direct:
+        env = req.runtime.env_name or req.runtime.base_url or "default"
+        message = f"直连执行 {len(direct)} 条用例 · 环境 {env}"
+        async for ev in _emit_text_tokens(message, chunk=16, delay=0):
+            yield ev
+        state["drafts"] = direct
+        state["message"] = message
+        yield EngineEvent(event="message", data={"content": message, "mode": "direct"})
+        return
+
     payload = json.dumps({"artifacts": req.artifacts, "runtime": req.runtime.model_dump()}, ensure_ascii=False)
     data: dict[str, Any] = {}
 
@@ -239,7 +258,7 @@ async def _plan_stream(state: GraphState) -> AsyncIterator[EngineEvent]:
             async for ev in _emit_text_tokens(message, chunk=12, delay=0):
                 yield ev
 
-    plan = _steps_from_cases(req) or _attach_case_meta(req, data.get("plan") or [])
+    plan = _attach_case_meta(req, data.get("plan") or [])
     message = data.get("message") or "开始执行"
     state["drafts"] = plan
     state["message"] = message

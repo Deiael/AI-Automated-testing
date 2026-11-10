@@ -27,12 +27,18 @@ class ProjectIn(BaseModel):
     runtime_base_url: str = ""
     runtime_headers: dict[str, Any] = Field(default_factory=dict)
     runtime_variables: dict[str, Any] = Field(default_factory=dict)
+    runtime_envs: list[dict[str, Any]] = Field(default_factory=list)
     defect_config: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("runtime_headers", "runtime_variables", "defect_config", mode="before")
     @classmethod
     def _none_dict(cls, v: Any) -> dict[str, Any]:
         return v or {}
+
+    @field_validator("runtime_envs", mode="before")
+    @classmethod
+    def _none_list(cls, v: Any) -> list:
+        return v or []
 
 
 class ProjectOut(ProjectIn):
@@ -147,6 +153,7 @@ class ChatIn(BaseModel):
     engine_profile_id: Optional[str] = None
     test_point_ids: list[str] = Field(default_factory=list)
     test_case_ids: list[str] = Field(default_factory=list)
+    env_id: Optional[str] = None
 
 
 class MessageOut(BaseModel):

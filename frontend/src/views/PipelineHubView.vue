@@ -16,6 +16,24 @@
         <p class="hint">{{ t('pipelineHub.createHint') }}</p>
       </div>
       <el-form label-position="top" @submit.prevent>
+        <el-form-item :label="t('pipelineHub.kind')" required>
+          <div class="kind-grid">
+            <button
+              v-for="k in kinds"
+              :key="k.id"
+              type="button"
+              class="kind-card"
+              :class="{ active: form.kind === k.id, disabled: !k.available }"
+              :disabled="!k.available"
+              @click="selectKind(k)"
+            >
+              <span class="kind-ico">{{ k.ico }}</span>
+              <strong>{{ t(k.titleKey) }}</strong>
+              <small>{{ t(k.descKey) }}</small>
+              <span v-if="!k.available" class="soon">{{ t('pipelineHub.comingSoon') }}</span>
+            </button>
+          </div>
+        </el-form-item>
         <div class="fields">
           <el-form-item :label="t('pipelineHub.name')" required>
             <el-input v-model="form.name" :placeholder="t('pipelineHub.namePh')" />
@@ -78,7 +96,8 @@
           @click="$router.push(`/pipelines/${row.id}`)"
         >
           <div class="top">
-            <span class="status-pill">{{ stepLabel(row.step) }}</span>
+            <span class="status-pill">{{ kindLabel(row.kind) }}</span>
+            <span class="status-pill soft">{{ stepLabel(row.step) }}</span>
             <span class="mono">{{ String(row.id).slice(0, 8) }}</span>
           </div>
           <h3>{{ row.name }}</h3>
@@ -101,6 +120,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
+import { PIPELINE_KINDS, pipelineKindOf, type PipelineKind } from '../pipelineKinds'
 import { useCurrentProject } from '../composables/useCurrentProject'
 import { usePetStore } from '../stores/pet'
 
@@ -115,13 +135,26 @@ const creating = ref(false)
 const creatingProject = ref(false)
 const showNewProject = ref(false)
 
-const form = reactive({ name: '', project_id: '', description: '' })
+const kinds = PIPELINE_KINDS
+const form = reactive({ name: '', project_id: '', description: '', kind: 'api' })
 const projectForm = reactive({ name: '', runtime_base_url: 'https://httpbin.org', description: '' })
 
 function stepLabel(step: string) {
   if (step === 'cases') return t('pipelineHub.stepCases')
   if (step === 'report') return t('pipelineHub.stepReport')
   return t('pipelineHub.stepReq')
+}
+
+function kindLabel(kind: string) {
+  return t(pipelineKindOf(kind).titleKey)
+}
+
+function selectKind(k: PipelineKind) {
+  if (!k.available) {
+    ElMessage.info(t('pipelineHub.comingSoonHint', { name: t(k.titleKey) }))
+    return
+  }
+  form.kind = k.id
 }
 
 async function load() {
@@ -169,6 +202,7 @@ async function create() {
       name: form.name.trim(),
       project_id: form.project_id,
       description: form.description,
+      kind: form.kind,
       step: 'req',
     })
     setCurrentProjectId(form.project_id)
@@ -183,6 +217,67 @@ onMounted(load)
 </script>
 
 <style scoped>
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.kind-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  min-height: 118px;
+  padding: 14px 14px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.kind-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(15, 143, 134, 0.45);
+}
+.kind-card.active {
+  border-color: rgba(15, 143, 134, 0.7);
+  background: rgba(15, 143, 134, 0.08);
+  box-shadow: 0 0 0 1px rgba(15, 143, 134, 0.2);
+}
+.kind-card.disabled,
+.kind-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  background: rgba(247, 250, 251, 0.9);
+}
+.kind-ico {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--teal-deep);
+}
+.kind-card strong {
+  font-family: var(--font-brand);
+  font-size: 15px;
+}
+.kind-card small {
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.soon {
+  margin-top: auto;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--teal-deep);
+}
+.top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.status-pill.soft { background: rgba(15, 40, 50, 0.06); color: var(--ink-soft); }
+
 .create { padding: 22px 24px; margin-bottom: 22px; }
 .create-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; }
 .kicker { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal-deep); font-weight: 650; }
@@ -200,7 +295,6 @@ onMounted(load)
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; min-height: 40px; }
 .tile { text-align: left; border: 1px solid var(--line); border-radius: 18px; padding: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.94), rgba(235,247,246,0.75)); box-shadow: var(--shadow-soft); cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; font: inherit; color: inherit; min-height: 180px; display: flex; flex-direction: column; }
 .tile:hover { transform: translateY(-3px); border-color: rgba(15, 143, 134, 0.4); }
-.top { display: flex; justify-content: space-between; margin-bottom: 12px; }
 .mono { color: var(--mute); font-family: var(--font-mono); font-size: 12px; }
 .tile h3 { margin: 0; font-family: var(--font-brand); font-size: 20px; }
 .tile p { margin: 8px 0 0; color: var(--mute); font-size: 13px; flex: 1; }
@@ -211,5 +305,6 @@ onMounted(load)
   .fields { grid-template-columns: 1fr; }
   .create-head { flex-direction: column; align-items: flex-start; }
   .hint { text-align: left; }
+  .kind-grid { grid-template-columns: 1fr 1fr; }
 }
 </style>

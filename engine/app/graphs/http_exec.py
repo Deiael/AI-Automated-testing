@@ -248,6 +248,33 @@ async def run_step(
 
     req_snap = {"method": method, "url": url, "headers": headers, "query": query, "body": body}
     started = time.perf_counter()
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return {
+            "case_id": step.get("case_id"),
+            "case_title": step.get("case_title") or rendered.get("title"),
+            "confidence": step.get("confidence"),
+            "ok": False,
+            "time_ms": 0,
+            "status_code": 0,
+            "error": "未配置执行环境 Base URL，无法拼接请求地址",
+            "failed": ["url"],
+            "request": req_snap,
+            "response": {"status_code": 0, "headers": {}, "body_preview": "", "json": None},
+            "assertions": [
+                {
+                    "name": "url",
+                    "ok": False,
+                    "expected": "绝对 URL 或项目环境 Base URL + path",
+                    "actual": url,
+                    "message": "请在项目概览配置执行环境（测试/预发/生产）的 Base URL",
+                }
+            ],
+            "extracted": {},
+            "variables_after": vars_now,
+            "url": url,
+            "method": method,
+            "body_preview": "",
+        }
     try:
         kwargs: dict[str, Any] = {"headers": headers, "params": query}
         if method not in ("GET", "HEAD", "DELETE") or body not in (None, ""):

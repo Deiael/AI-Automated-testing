@@ -17,6 +17,7 @@ from app.api import (
     pipelines,
     projects,
     rag,
+    regression,
     sessions,
     skills,
     tools,
@@ -52,6 +53,7 @@ app.include_router(analytics.router)
 app.include_router(openapi_specs.router)
 app.include_router(coverage.router)
 app.include_router(ci.router)
+app.include_router(regression.router)
 
 
 @app.on_event("startup")

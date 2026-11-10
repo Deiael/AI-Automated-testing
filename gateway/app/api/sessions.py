@@ -204,6 +204,9 @@ async def chat(session_id: str, body: ChatIn, db: Session = Depends(get_db)):
             )
         )
 
+    from app.services.runtime_env import resolve_env
+
+    env = resolve_env(project, getattr(body, "env_id", None))
     req = EngineRequest(
         request_id=str(uuid.uuid4()),
         flow=FlowType(session.flow_type),
@@ -214,9 +217,12 @@ async def chat(session_id: str, body: ChatIn, db: Session = Depends(get_db)):
         template=template,
         artifacts=artifacts,
         runtime=RuntimeConfig(
-            base_url=project.runtime_base_url or "",
-            headers=project.runtime_headers or {},
-            variables=project.runtime_variables or {},
+            base_url=env.get("base_url") or "",
+            headers=env.get("headers") or {},
+            variables=env.get("variables") or {},
+            env_id=str(env.get("id") or ""),
+            env_name=str(env.get("name") or ""),
+            timeout_sec=float(env.get("timeout_sec") or 30),
         ),
     )
 

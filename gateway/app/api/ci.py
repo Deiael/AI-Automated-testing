@@ -23,6 +23,7 @@ class CiRunIn(BaseModel):
     case_ids: list[str] = Field(default_factory=list)
     engine_profile_id: Optional[str] = None
     trigger: str = "ci"
+    env_id: Optional[str] = None
 
 
 class ScheduleIn(BaseModel):
@@ -60,6 +61,7 @@ async def ci_run(body: CiRunIn, db: Session = Depends(get_db)):
             case_ids=body.case_ids or None,
             engine_profile_id=body.engine_profile_id,
             trigger=body.trigger or "ci",
+            env_id=body.env_id,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

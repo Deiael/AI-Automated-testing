@@ -41,6 +41,9 @@ class RuntimeConfig(BaseModel):
     base_url: str = ""
     headers: dict[str, str] = Field(default_factory=dict)
     variables: dict[str, Any] = Field(default_factory=dict)
+    env_id: str = ""
+    env_name: str = ""
+    timeout_sec: float = 30.0
 
 
 class EngineRequest(BaseModel):

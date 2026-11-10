@@ -127,6 +127,7 @@ const props = defineProps<{
   testPointIds?: string[]
   testCaseIds?: string[]
   initialMessage?: string
+  envId?: string
 }>()
 const emit = defineEmits<{ (e: 'artifact', payload: any): void; (e: 'done'): void }>()
 
@@ -235,6 +236,7 @@ async function send() {
         engine_profile_id: props.engineProfileId,
         test_point_ids: props.testPointIds,
         test_case_ids: props.testCaseIds,
+        env_id: props.envId,
       },
       (ev) => {
         if (ev.event === 'meta') {

@@ -2,7 +2,7 @@
   <div class="pipeline page" v-loading="booting">
     <div class="pipe-head panel" v-if="pipeline">
       <div>
-        <div class="kicker">Pipeline</div>
+        <div class="kicker">{{ t(pipelineKindOf(pipeline.kind).titleKey) }}</div>
         <h2>{{ pipeline.name }}</h2>
         <p>
           {{ t('pipeline.linkedProject') }}<strong>{{ pipeline.project_name || pid }}</strong>
@@ -119,6 +119,15 @@
 
       <CoverageBoard v-if="pid" ref="coverageRef" class="coverage-block" :project-id="pid" :pipeline-id="pipelineId" />
 
+      <VersionRegressionPanel
+        v-if="pid && pipeline?.kind === 'version_regression'"
+        class="vreg-block"
+        :project-id="pid"
+        :pipeline-id="pipelineId"
+        @generated="onRegressionGenerated"
+        @ran="reloadReports"
+      />
+
       <div class="gen-grid">
         <div class="chat-col">
           <ChatPanel
@@ -185,6 +194,14 @@
           <p>{{ t('pipeline.report.tip') }}</p>
         </div>
         <div class="head-actions">
+          <el-select v-model="runEnvId" :placeholder="t('pipeline.report.env')" style="width: 220px">
+            <el-option
+              v-for="e in execEnvs"
+              :key="e.id"
+              :label="`${e.name} · ${e.base_url || t('pipeline.report.noBase')}`"
+              :value="e.id"
+            />
+          </el-select>
           <el-button @click="goStep('cases')">{{ t('common.previous') }}</el-button>
           <el-button type="primary" :disabled="!confirmedCases.length" :loading="startingRun" @click="startExecute">
             {{ t('pipeline.report.run') }}
@@ -200,6 +217,7 @@
             :session-id="runSessionId"
             :test-case-ids="runCaseIds"
             :initial-message="runKickoff"
+            :env-id="runEnvId"
             @artifact="reloadReports"
             @done="reloadReports"
           />
@@ -262,6 +280,8 @@ import ReportViewer from '../components/ReportViewer.vue'
 import TemplatesView from './TemplatesView.vue'
 import OpenApiImportPanel from '../components/OpenApiImportPanel.vue'
 import CoverageBoard from '../components/CoverageBoard.vue'
+import VersionRegressionPanel from '../components/VersionRegressionPanel.vue'
+import { pipelineKindOf } from '../pipelineKinds'
 import SchedulePanel from '../components/SchedulePanel.vue'
 import DefectConfigPanel from '../components/DefectConfigPanel.vue'
 import { usePetStore } from '../stores/pet'
@@ -305,6 +325,17 @@ const runSessionId = ref('')
 const runCaseIds = ref<string[]>([])
 const runKickoff = ref('')
 const startingRun = ref(false)
+const execProject = ref<any>(null)
+const runEnvId = ref('')
+const execEnvs = computed(() => {
+  const p = execProject.value
+  if (!p) return []
+  const listed = Array.isArray(p.runtime_envs) ? p.runtime_envs.filter((e: any) => e && (e.id || e.name)) : []
+  if (listed.length) {
+    return listed.map((e: any) => ({ ...e, id: e.id || e.name }))
+  }
+  return [{ id: 'default', name: 'default', base_url: p.runtime_base_url || '', is_default: true }]
+})
 const runningCaseId = ref('')
 const runs = ref<any[]>([])
 const reports = ref<any[]>([])
@@ -340,6 +371,11 @@ async function goStep(key: StepKey) {
     coverageRef.value?.load()
   }
   if (key === 'report') reloadReports()
+}
+
+async function onRegressionGenerated() {
+  await refreshArtifacts()
+  coverageRef.value?.load()
 }
 
 async function onOpenApiImported() {
@@ -499,6 +535,11 @@ async function confirmAllCases() {
 }
 
 async function startExecute() {
+  const env = execEnvs.value.find((e) => e.id === runEnvId.value) || execEnvs.value[0]
+  if (!env?.base_url) {
+    ElMessage.warning(t('pipeline.report.needEnv'))
+    return
+  }
   startingRun.value = true
   try {
     await openExecuteSession(confirmedCases.value.map((c) => c.id), t('pipeline.report.kickoff'))
@@ -509,6 +550,11 @@ async function startExecute() {
 }
 
 async function startSingleCase(row: any) {
+  const env = execEnvs.value.find((e) => e.id === runEnvId.value) || execEnvs.value[0]
+  if (!env?.base_url) {
+    ElMessage.warning(t('pipeline.report.needEnv'))
+    return
+  }
   runningCaseId.value = row.id
   try {
     if (row.status !== 'CONFIRMED') {
@@ -552,7 +598,8 @@ function formatSummary(s: any) {
   const time = s.time_ms != null ? ` · ${s.time_ms}ms` : ''
   const conf = s.confidence_avg != null ? ` · conf ${Math.round(Number(s.confidence_avg) * 100)}%` : ''
   const mcp = s.mcp_calls != null ? ` · mcp ${s.mcp_calls}` : ''
-  return `total ${total} · pass ${passed} · fail ${failed}${time}${conf}${mcp}`
+  const env = s.env_name ? ` · ${s.env_name}` : ''
+  return `total ${total} · pass ${passed} · fail ${failed}${time}${conf}${mcp}${env}`
 }
 
 function skillLabel(comp: any) {
@@ -575,6 +622,14 @@ async function boot() {
     }
     pipeline.value = await api.getPipeline(pipelineId.value)
     pid.value = pipeline.value.project_id
+    try {
+      execProject.value = await api.getProject(pid.value)
+      const envs = execEnvs.value
+      const def = envs.find((e) => e.is_default) || envs[0]
+      if (def && !runEnvId.value) runEnvId.value = def.id
+    } catch {
+      execProject.value = null
+    }
     const saved = pipeline.value.step as StepKey
     if (saved && ['req', 'cases', 'report'].includes(saved)) step.value = saved
     await loadTemplates()
@@ -887,7 +942,8 @@ onMounted(boot)
 }
 
 .openapi-block,
-.coverage-block {
+.coverage-block,
+.vreg-block {
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
